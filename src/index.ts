@@ -1,5 +1,6 @@
 import './env.js';
 import { start } from './services/bot.js';
+import { tg } from './config.js';
 
 start();
-console.log('GPTitor bot is running');
+console.log(`${tg.botName} is running`);

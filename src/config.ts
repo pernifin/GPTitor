@@ -1,14 +1,14 @@
 export const tg = {
-  botName: 'gptitorbot',
+  botName: process.env.NODE_ENV === 'production' ? 'GPTitorBot' : 'StageGPTitorBot', 
   options: {
     polling: true
   },
 };
 
 export const ai = {
-  options: {
+  defaultSettings: {
     model: 'gpt-3.5-turbo',
-    temperature: 0.7
+    temperature: 0.7,
+    systemMessage: '',
   },
-  systemMessage: null
 }
