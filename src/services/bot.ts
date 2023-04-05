@@ -24,8 +24,16 @@ export function createBot() {
 }
 
 export function attachCommands(bot: TelegramBot) {
-  Object.entries(commands).map(([name, callback]) => {
-    bot.onText(new RegExp(`^/${name}$`), (msg) => callback(bot, msg));
+  bot.onText(/^\/(\w+)$/, (msg, match) => {
+    if (getMenuActionHook(msg.chat.id)) {
+      return;
+    }
+    
+    const command = match?.[1] as keyof typeof commands;
+    const callback = commands[command];
+    if (callback) {
+      callback(bot, msg);
+    }
   });
 }
 

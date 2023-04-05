@@ -98,11 +98,10 @@ function buildTopMenu(bot: TelegramBot) {
       action: (query: CallbackQuery) => {
         menuActionHook[query.message?.chat.id!] = async (msg: Message) => {
           const value = parseFloat(msg.text!);
-          if (value < 0 || value > 2) {
-            return;
+          if (value >= 0 && value <= 2) {
+            setSetting(msg.chat.id, 'temperature', value);
           }
 
-          setSetting(msg.chat.id, 'temperature', value);
           await bot.deleteMessage(msg.chat.id, query.message?.message_id!);
           delete menuActionHook[msg.chat.id];
           delete activeMenu[msg.chat.id];
