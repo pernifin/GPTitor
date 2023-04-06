@@ -80,16 +80,14 @@ export default async function(bot: TelegramBot, msg: Message) {
   const messages = getConversation(msg);
   messages.push({ role: 'user', content: question });
 
-  console.log(messages);
-
   try {
     const { model, temperature } = getSettings(msg.chat.id);
     const { data: { choices } } = await openai.createChatCompletion({ 
       model, temperature, messages
     });
 
-    const answer = choices.map(
-        (choice, index) => `${String.fromCharCode(0xfe0f + index)}${choice.message?.content}`
+    const answer = choices.map((choice, index) => 
+        `${choices.length > 1 ? String.fromCharCode(0x0031 + index, 0x20e3, 0x20): ''}${choice.message?.content}`
       )
       .join('\n\n');
 

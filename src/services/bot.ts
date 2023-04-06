@@ -53,4 +53,8 @@ export function listenToQuestions(bot: TelegramBot) {
 
     commands.answer(bot, msg);
   });
+
+  bot.on('photo', (msg) => {
+    
+  });
 }

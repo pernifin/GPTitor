@@ -1,5 +1,7 @@
+import chunk from 'lodash/chunk.js';
+import { ai } from '../config.js';
 import openai, { getSettings, setSetting } from './openai.js';
-import { escapeReponse, capitalize } from '../utils/format.js';
+import { escapeReponse } from '../utils/format.js';
 
 import type TelegramBot from 'node-telegram-bot-api';
 import type { Message, CallbackQuery, InlineKeyboardButton } from 'node-telegram-bot-api';
@@ -10,35 +12,37 @@ export type MenuItem = {
   action: (query: CallbackQuery) => Promise<any>;
 }
 
-let activeMenu: { [key: number]: MenuItem[] } = {};
+let activeMenu: { [key: number]: { msgId: number, items: MenuItem[] } } = {};
 let menuActionHook: { [key: number]: (msg: Message) => Promise<any> } = {};
 
-export function renderTopMenu(bot: TelegramBot, chatId: number) {
-  if (!activeMenu[chatId]) {
-    activeMenu[chatId] = buildTopMenu(bot);
-  }
+export async function renderTopMenu(bot: TelegramBot, msg: Message) {
+  if (activeMenu[msg.chat.id]) {
+    await bot.deleteMessage(msg.chat.id, activeMenu[msg.chat.id].msgId);
+  } 
 
-  const menu = activeMenu[chatId];
-  const settings = getSettings(chatId);
-  const buttons = menu.map(({ id, text }) => ({ text, callback_data: id }));
-  const message = Object.entries(settings)
-    .map(([key, value]) => `*${capitalize(key)}*: ${escapeReponse(value)}`)
-    .join('\n');
+  const menu = buildTopMenu(bot);
+  const settings = getSettings(msg.chat.id);
+  const message = [
+    `*Current model*: ${escapeReponse(settings.model)}`,
+    `*Creativity*: ${getCreativityLabel(settings.temperature)}`,
+    `*System message*: ${escapeReponse(settings.systemMessage || 'N/A')}`,
+  ].join('\n');
 
-  return bot.sendMessage(chatId, message, { 
+  const reply = await bot.sendMessage(msg.chat.id, message, { 
     parse_mode: 'MarkdownV2',
     reply_markup: {
-      inline_keyboard: [buttons]
+      inline_keyboard: buildButtonRow(menu)
     }
   });
+
+  setActiveMenu(reply, menu);
 }
 
 export async function callMenuAction(query: CallbackQuery) {
-  const menu = activeMenu[query.message?.chat.id!];
-  const menuItem = menu?.find(({ id }) => id === query.data);
-  if (menuItem) {
-    return menuItem.action(query);
-  }
+  return activeMenu[query.message?.chat.id!]
+    ?.items
+    ?.find(({ id }) => id === query.data)
+    ?.action(query);
 }
 
 export function getMenuActionHook(chatId: number) {
@@ -46,75 +50,81 @@ export function getMenuActionHook(chatId: number) {
 }
 
 function buildTopMenu(bot: TelegramBot) {
-  const updateModel = (engineId: string) => async (query: CallbackQuery) => {
-    setSetting(query.message?.chat.id!, 'model', engineId);
-    await bot.deleteMessage(query.message?.chat.id!, query.message?.message_id!);
-    delete activeMenu[query.message?.chat.id!];
-    return renderTopMenu(bot, query.message?.chat.id!);
-  };
-
   return [
     { 
-      id: 'back', 
-      text: '⏪ Back', 
-      action: (query: CallbackQuery) => bot.deleteMessage(query.message?.chat.id!, query.message?.message_id!)
+      id: 'back',
+      text: '⏪ Back',
+      action: (query: CallbackQuery) => {
+        delete activeMenu[query.message?.chat.id!];
+        return bot.deleteMessage(query.message?.chat.id!, query.message?.message_id!);
+      }
     },
     {
       id: 'model',
-      text: '🔄 Switch model', 
+      text: '🛠️ Switch model', 
       action: async (query: CallbackQuery) => {
         const response = await openai.listEngines();
         const subMenu = response.data.data
-          .filter(engine => engine.ready)
+          .filter(engine => engine.ready && ai.whitelistModels.includes(engine.id))
           .map(engine => ({ 
             id: `model:${engine.id}`,
             text: engine.id,
-            action: updateModel(engine.id)
+            action: (query: CallbackQuery) => {
+              setSetting(query.message?.chat.id!, 'model', engine.id);
+              return renderTopMenu(bot, query.message!);
+            }
           }));
 
-        activeMenu[query.message?.chat.id!] = subMenu;
-
         const message = `${query.message?.text}\n\nSelect available model:`;
-        const buttons: InlineKeyboardButton[][] = [];
-
-        subMenu.forEach(({ id, text }, index) => {
-          const row = Math.floor(index / 3);
-          buttons[row] = buttons[row] || [];
-          buttons[row].push({ text, callback_data: id });
-        });
-
-        return bot.editMessageText(message, {
+        const reply = await bot.editMessageText(message, {
           chat_id: query.message?.chat.id,
           message_id: query.message?.message_id,
           reply_markup: {
-            inline_keyboard: buttons
+            inline_keyboard: buildButtonRow(subMenu)
           }
         });
+
+        setActiveMenu(reply as Message, subMenu);
       }
     },
     {
       id: 'temperature',
-      text: '↕️ Change temperature',
-      action: (query: CallbackQuery) => {
-        menuActionHook[query.message?.chat.id!] = async (msg: Message) => {
-          const value = parseFloat(msg.text!);
-          if (value >= 0 && value <= 2) {
-            setSetting(msg.chat.id, 'temperature', value);
-          }
+      text: '💡 Set creativity level',
+      action: async (query: CallbackQuery) => {
+        const subMenu = Object.entries(ai.creativityLevels)
+          .sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
+          .map(([id, label]) => ({ 
+            id: `level:${id}`,
+            text: label,
+            action: (query: CallbackQuery) => {
+              setSetting(query.message?.chat.id!, 'temperature', parseFloat(id));
+              return renderTopMenu(bot, query.message!);
+            }
+          }));
 
-          await bot.deleteMessage(msg.chat.id, query.message?.message_id!);
-          delete menuActionHook[msg.chat.id];
-          delete activeMenu[msg.chat.id];
-
-          return renderTopMenu(bot, msg.chat.id);
-        };
-
-        const message = `${query.message?.text}\n\nEnter value between 0.0 and 2.0:`;
-        return bot.editMessageText(message, {
+        const message = `${query.message?.text}\n\nSelect level:\n`;
+        const reply = await bot.editMessageText(message, {
           chat_id: query.message?.chat.id,
           message_id: query.message?.message_id,
+          reply_markup: {
+            inline_keyboard: buildButtonRow(subMenu)
+          }
         });
+
+        setActiveMenu(reply as Message, subMenu);
       }
     }
   ];
+}
+
+function setActiveMenu(msg: Message, items: MenuItem[]) {
+  activeMenu[msg.chat.id] = { msgId: msg.message_id, items };
+}
+
+function buildButtonRow(items: MenuItem[], size = 3): InlineKeyboardButton[][] {
+  return chunk(items.map(({ id, text }) => ({ text, callback_data: id })), size);
+}
+
+function getCreativityLabel(value: number) {
+  return ai.creativityLevels[value.toFixed(1) as keyof typeof ai.creativityLevels];
 }
