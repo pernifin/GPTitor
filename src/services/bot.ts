@@ -4,6 +4,8 @@ import { tg } from '../config.js';
 import commands from '../commands/index.js';
 import { callMenuAction, getMenuActionHook } from '../services/menu.js';
 
+import type { Message } from 'node-telegram-bot-api';
+
 const { BOT_TOKEN = '' } = process.env;
 
 export function start() {
@@ -24,7 +26,7 @@ export function createBot() {
 }
 
 export function attachCommands(bot: TelegramBot) {
-  bot.onText(/^\/(\w+)$/, (msg, match) => {
+  bot.onText(/^\/(\w+)(?:\s.+)?$/, (msg, match) => {
     if (getMenuActionHook(msg.chat.id)) {
       return;
     }
@@ -45,16 +47,9 @@ export function handleMenuActions(bot: TelegramBot) {
 }
 
 export function listenToQuestions(bot: TelegramBot) {
-  bot.on('text', (msg) => {
-    const hook = getMenuActionHook(msg.chat.id);
-    if (hook) {
-      return hook(msg);
-    }
+  bot.on('text', (msg) => commands.answer(bot, msg));
 
-    commands.answer(bot, msg);
-  });
-
-  bot.on('photo', (msg) => {
+  // bot.on('photo', (msg) => {
     
-  });
+  // });
 }

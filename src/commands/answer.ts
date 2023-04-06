@@ -2,7 +2,7 @@ import axios from 'axios';
 
 import openai, { getSettings } from '../services/openai.js';
 import { ai, tg } from '../config.js';
-import { escapeReponse } from '../utils/format.js';
+import { escapeReponse, getCleanMessage } from '../utils/format.js';
 
 import type { ChatCompletionRequestMessage } from 'openai';
 import type TelegramBot from 'node-telegram-bot-api';
@@ -17,21 +17,21 @@ function hasBotMention(msg: Message) {
   );
 }
 
-function isReplyToAnswer(msg: Message) {
-  return Boolean(msg.reply_to_message && conversations[msg.chat.id]?.[msg.reply_to_message?.message_id]);
+function hasBotCommand(msg: Message) {
+  return msg.entities?.some(entity => entity.type === 'bot_command');
 }
 
-function getCleanMessage(msg: Message) {
-  return msg.text!.replace(/(^|\s)([\/@]\w+(?=\s|\/|@|$))+/gm, '');
+function isReplyToAnswer(msg: Message) {
+  return Boolean(msg.reply_to_message && conversations[msg.chat.id]?.[msg.reply_to_message?.message_id]);
 }
 
 function getQuestion(msg: Message) {
   switch (msg.chat.type) {
     case 'private':
-      return getCleanMessage(msg);
+      return getCleanMessage(msg.text!);
     case 'group':
     case 'supergroup':
-      return hasBotMention(msg) || isReplyToAnswer(msg) ? getCleanMessage(msg) : null;
+      return hasBotMention(msg) || isReplyToAnswer(msg) ? getCleanMessage(msg.text!) : null;
     default:
       return null;
   }
@@ -78,6 +78,10 @@ function saveReply(msg: Message, reply: Message, question: string, answer: strin
 }
 
 export default async function(bot: TelegramBot, msg: Message) {
+  if (hasBotCommand(msg)) {
+    return;
+  }
+
   const question = getQuestion(msg);
   const messages = getConversation(msg);
 
