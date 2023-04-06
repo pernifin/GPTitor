@@ -43,12 +43,18 @@ function getConversation(msg: Message) {
   let replyId = msg.reply_to_message?.message_id;
 
   while (replyId) {
-    const { question, answer, replyTo } = conversations[msg.chat.id][replyId];
-    conversation.unshift(
-      { role: 'user', content: question },
-      { role: 'assistant', content: answer }
-    );
-    replyId = replyTo;
+    if (conversations[msg.chat.id]?.[replyId]) {
+      const { question, answer, replyTo } = conversations[msg.chat.id][replyId];
+      conversation.unshift(
+        { role: 'user', content: question },
+        { role: 'assistant', content: answer }
+      );
+      replyId = replyTo;
+    } else {
+      conversation.unshift(
+        { role: 'user', content: msg.reply_to_message?.text! },
+      );
+    }
   }
 
   if (systemMessage) {
@@ -73,12 +79,15 @@ function saveReply(msg: Message, reply: Message, question: string, answer: strin
 
 export default async function(bot: TelegramBot, msg: Message) {
   const question = getQuestion(msg);
-  if (!question) {
+  const messages = getConversation(msg);
+
+  if (question) {
+    messages.push({ role: 'user', content: question });
+  }
+  
+  if (messages.length === 0 || messages[messages.length - 1].role === 'assistant') {
     return;
   }
-
-  const messages = getConversation(msg);
-  messages.push({ role: 'user', content: question });
 
   try {
     const { model, temperature } = getSettings(msg.chat.id);
@@ -91,8 +100,11 @@ export default async function(bot: TelegramBot, msg: Message) {
       )
       .join('\n\n');
 
-    const reply = await bot.sendMessage(msg.chat.id, escapeReponse(answer), { parse_mode: 'MarkdownV2' });
-    saveReply(msg, reply, question, answer);
+    const reply = await bot.sendMessage(msg.chat.id, escapeReponse(answer), { 
+      parse_mode: 'MarkdownV2',
+      reply_to_message_id: isReplyToAnswer(msg) ? msg.message_id : undefined
+    });
+    saveReply(msg, reply, question ?? messages[messages.length - 1].content, answer);
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error(error.response?.data?.error ?? error);
