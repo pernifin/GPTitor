@@ -18,7 +18,7 @@ function hasBotMention(msg: Message) {
 }
 
 function isReplyToAnswer(msg: Message) {
-  return Boolean(msg.reply_to_message && conversations[msg.chat.id][msg.reply_to_message?.message_id]);
+  return Boolean(msg.reply_to_message && conversations[msg.chat.id]?.[msg.reply_to_message?.message_id]);
 }
 
 function getCleanMessage(msg: Message) {
