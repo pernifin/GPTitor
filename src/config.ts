@@ -12,6 +12,10 @@ export const ai = {
   defaultSettings: {
     model: 'gpt-3.5-turbo',
     temperature: 0.7,
-    systemMessage: '',
+    systemMessage: `
+      Your are an AI assistant. 
+      You can answer questions and help people. 
+      When being asked to generate a piece of code always wraps it in three backticks (\`).
+    `,
   },
 }

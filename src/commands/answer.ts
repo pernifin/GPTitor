@@ -98,7 +98,7 @@ export default async function(bot: TelegramBot, msg: Message) {
     return;
   }
 
-  debug('Incoming question in "%s"', msg.chat.title);
+  debug('Incoming question in "%s"', msg.chat.title || msg.chat.username || msg.chat.first_name);
   const question = getQuestion(msg);
   const messages = getConversation(msg);
 
