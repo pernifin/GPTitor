@@ -12,8 +12,8 @@ export type MenuItem = {
   action: (query: CallbackQuery) => Promise<any>;
 }
 
-let activeMenu: { [key: number]: { msgId: number, items: MenuItem[] } } = {};
-let menuActionHook: { [key: number]: (msg: Message) => Promise<any> } = {};
+const activeMenu: { [key: number]: { msgId: number, items: MenuItem[] } } = {};
+const menuActionHook: { [key: number]: (msg: Message) => Promise<any> } = {};
 
 export async function renderTopMenu(bot: TelegramBot, msg: Message) {
   if (activeMenu[msg.chat.id]) {
