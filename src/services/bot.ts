@@ -1,55 +1,37 @@
 import TelegramBot from 'node-telegram-bot-api';
+import dbg from 'debug';
 
 import { tg } from '../config.js';
 import commands from '../commands/index.js';
-import { callMenuAction, getMenuActionHook } from '../services/menu.js';
+import { callMenuAction } from '../services/menu.js';
 
-import type { Message } from 'node-telegram-bot-api';
-
-const { BOT_TOKEN = '' } = process.env;
+const debug = dbg('bot:handlers');
+const { BOT_TOKEN = '', BOT_TOKEN_STAGE = '' } = process.env;
 
 export function start() {
-  const bot = createBot();
-  attachCommands(bot);
-  handleMenuActions(bot);
-  listenToQuestions(bot);
-}
-
-export function createBot() {
-  const tgBot = new TelegramBot(BOT_TOKEN, tg.options);
+  const bot = new TelegramBot(process.env.NODE_ENV === 'production' ? BOT_TOKEN : BOT_TOKEN_STAGE, tg.options);
 
   // bot.setWebHook('GPTitor', {
   //   certificate: './ssl/crt.pem'
   // });
-
-  return tgBot;
-}
-
-export function attachCommands(bot: TelegramBot) {
+  
   bot.onText(/^\/(\w+)(?:\s.+)?$/, (msg, match) => {
-    if (getMenuActionHook(msg.chat.id)) {
-      return;
-    }
-    
-    const command = match?.[1] as keyof typeof commands;
-    const callback = commands[command];
-    if (callback) {
-      callback(bot, msg);
+    debug('Incoming command "%o"', match);
+    const cmdName = match?.[1] as keyof typeof commands;
+    const command = commands[cmdName];
+
+    if (command) {
+      command(bot, msg);
     }
   });
-}
 
-export function handleMenuActions(bot: TelegramBot) {
   bot.on('callback_query', async (query) => {
+    debug('Handle menu query "%s"', query.id);
     await bot.answerCallbackQuery(query.id);
     await callMenuAction(query);
   });
-}
 
-export function listenToQuestions(bot: TelegramBot) {
   bot.on('text', (msg) => commands.answer(bot, msg));
 
-  // bot.on('photo', (msg) => {
-    
-  // });
+  bot.on('error', (error) => debug('Bot error "%O"', error));
 }

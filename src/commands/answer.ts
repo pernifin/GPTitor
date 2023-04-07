@@ -1,4 +1,5 @@
 import axios from 'axios';
+import dbg from 'debug';
 
 import openai, { getSettings } from '../services/openai.js';
 import { ai, tg } from '../config.js';
@@ -8,7 +9,18 @@ import type { ChatCompletionRequestMessage } from 'openai';
 import type TelegramBot from 'node-telegram-bot-api';
 import type { Message } from 'node-telegram-bot-api';
 
-const conversations: { [key: number]: { [key: number]: { id: number, question: string, answer: string, replyTo?: number } } } = {};
+const conversations: { 
+  [key: number]: {
+    [key: number]: {
+      msgId: number,
+      question: string,
+      answer: string,
+      replyTo?: number
+    }
+  }
+} = {};
+
+const debug = dbg('bot:answer');
 
 function hasBotMention(msg: Message) {
   return msg.entities?.some(entity =>
@@ -23,6 +35,10 @@ function hasBotCommand(msg: Message) {
 
 function isReplyToAnswer(msg: Message) {
   return Boolean(msg.reply_to_message && conversations[msg.chat.id]?.[msg.reply_to_message?.message_id]);
+}
+
+function shouldAnswer(msg: Message) {
+  return msg.chat.type === 'private' || hasBotMention(msg) || isReplyToAnswer(msg);
 }
 
 function getQuestion(msg: Message) {
@@ -42,19 +58,19 @@ function getConversation(msg: Message) {
   const conversation: ChatCompletionRequestMessage[] = [];
   let replyId = msg.reply_to_message?.message_id;
 
-  while (replyId) {
-    if (conversations[msg.chat.id]?.[replyId]) {
-      const { question, answer, replyTo } = conversations[msg.chat.id][replyId];
-      conversation.unshift(
-        { role: 'user', content: question },
-        { role: 'assistant', content: answer }
-      );
-      replyId = replyTo;
-    } else {
-      conversation.unshift(
-        { role: 'user', content: msg.reply_to_message?.text! },
-      );
-    }
+  if (replyId && !conversations[msg.chat.id]?.[replyId]) {
+    conversation.unshift(
+      { role: 'user', content: msg.reply_to_message?.text! },
+    );
+  }
+
+  while (replyId && conversations[msg.chat.id]?.[replyId]) {
+    const { question, answer, replyTo } = conversations[msg.chat.id][replyId];
+    conversation.unshift(
+      { role: 'user', content: question },
+      { role: 'assistant', content: answer }
+    );
+    replyId = replyTo;
   }
 
   if (systemMessage) {
@@ -69,8 +85,8 @@ function saveReply(msg: Message, reply: Message, question: string, answer: strin
     conversations[msg.chat.id] = {};
   }
 
-  conversations[msg.chat.id][reply.message_id] = { 
-    id: msg.message_id,
+  conversations[msg.chat.id][reply.message_id] = {
+    msgId: msg.message_id,
     question,
     answer,
     replyTo: msg.reply_to_message?.message_id
@@ -78,10 +94,11 @@ function saveReply(msg: Message, reply: Message, question: string, answer: strin
 }
 
 export default async function(bot: TelegramBot, msg: Message) {
-  if (hasBotCommand(msg)) {
+  if (hasBotCommand(msg) || !shouldAnswer(msg)) {
     return;
   }
 
+  debug('Incoming question in "%s"', msg.chat.title);
   const question = getQuestion(msg);
   const messages = getConversation(msg);
 
@@ -111,9 +128,9 @@ export default async function(bot: TelegramBot, msg: Message) {
     saveReply(msg, reply, question ?? messages[messages.length - 1].content, answer);
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      console.error(error.response?.data?.error ?? error);
+      debug(error.response?.data?.error ?? error);
     } else if (error instanceof Error) {
-      console.error(error.message ?? error);
+      debug(error.message ?? error);
     }
   }
 }

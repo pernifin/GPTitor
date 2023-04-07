@@ -1,7 +1,7 @@
 {
   "name": "gptitor",
   "type": "module",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "axios": "^1.3.4",
+    "debug": "^4.3.4",
     "dotenv": "^16.0.3",
     "lodash": "^4.17.21",
     "node-telegram-bot-api": "^0.61.0",
@@ -20,6 +21,7 @@
     "typescript": "^5.0.3"
   },
   "devDependencies": {
+    "@types/debug": "^4.1.7",
     "@types/lodash": "^4.14.192",
     "@types/node-telegram-bot-api": "^0.61.5"
   }
