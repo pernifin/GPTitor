@@ -58,8 +58,9 @@ function getConversation(msg: Message) {
   const conversation: ChatCompletionRequestMessage[] = [];
   let replyId = msg.reply_to_message?.message_id;
 
-  if (replyId && !conversations[msg.chat.id]?.[replyId]) {
+  if (replyId && !conversations[msg.chat.id]?.[replyId] && msg.reply_to_message !== null && msg.reply_to_message?.text !== null) {
     conversation.unshift(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       { role: 'user', content: msg.reply_to_message?.text! },
     );
   }

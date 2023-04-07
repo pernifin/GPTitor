@@ -1,5 +1,5 @@
 const specialChars = ['*', '[', ']', '(', ')', '+', '|', '{', '}', '.'].map((char) => `\\${char}`)
-const regularChars = ['_', '~', '(?<!\`)\`(?!`)', '>', '#', '-', '=', '!'].join('|');
+const regularChars = ['_', '~', '(?<!`)`(?!`)', '>', '#', '-', '=', '!'].join('|');
 const regex = new RegExp(specialChars.concat(regularChars).join('|'), 'gm');
 
 export function escapeReponse(message: string|number) {
@@ -11,5 +11,5 @@ export function capitalize(str: string) {
 }
 
 export function getCleanMessage(msg: string) {
-  return msg.replace(/(^|\s)([\/@]\w+(?=\s|\/|@|$))+/gm, '');
+  return msg.replace(/(^|\s)([/@]\w+(?=\s|\/|@|$))+/gm, '');
 }
