@@ -16,10 +16,10 @@ export function start() {
   // });
   
   bot.onText(/^\/(\w+)(?:\s.+)?$/, (msg, match) => {
-    debug('Incoming command "%o"', match);
     const cmdName = match?.[1] as keyof typeof commands;
     const command = commands[cmdName];
 
+    debug('Incoming command "%s"', cmdName);
     if (command) {
       command(bot, msg);
     }

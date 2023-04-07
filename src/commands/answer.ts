@@ -2,7 +2,7 @@ import axios from 'axios';
 import dbg from 'debug';
 
 import openai, { getSettings } from '../services/openai.js';
-import { ai, tg } from '../config.js';
+import { tg } from '../config.js';
 import { escapeReponse, getCleanMessage } from '../utils/format.js';
 
 import type { ChatCompletionRequestMessage } from 'openai';
@@ -128,9 +128,9 @@ export default async function(bot: TelegramBot, msg: Message) {
     saveReply(msg, reply, question ?? messages[messages.length - 1].content, answer);
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      debug(error.response?.data?.error ?? error);
+      console.error(error.response?.data?.error ?? error);
     } else if (error instanceof Error) {
-      debug(error.message ?? error);
+      console.error(error.message ?? error);
     }
   }
 }
