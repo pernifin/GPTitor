@@ -1,6 +1,7 @@
 import './env.js';
 import { start } from './services/bot.js';
-import { tg } from './config.js';
 
-start();
-console.log(`${tg.botName} is running`);
+const { BOT_TOKEN = '', BOT_TOKEN_STAGE = '' } = process.env;
+
+const token = process.env.NODE_ENV === 'production' ? BOT_TOKEN : BOT_TOKEN_STAGE;
+start(token);

@@ -1,7 +1,6 @@
-import { renderTopMenu } from '../services/menu.js';
+import TelegramBot, { Message } from 'node-telegram-bot-api';
 
-import type TelegramBot from 'node-telegram-bot-api';
-import type { Message } from 'node-telegram-bot-api';
+import { renderTopMenu } from '../services/menu.js';
 
 export default async function(bot: TelegramBot, msg: Message) {
   return renderTopMenu(bot, msg);

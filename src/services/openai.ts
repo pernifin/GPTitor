@@ -1,21 +1,32 @@
 import { Configuration, OpenAIApi } from 'openai';
-import { ai } from '../config.js';
+import config from '../config.js';
 
-const { OPENAI_KEY = '' } = process.env;
-const settings: { [key: number]: Settings } = {};
-const configuration = new Configuration({ apiKey: OPENAI_KEY });
+export type Settings = typeof config.chatCompletionSettings;
 
-export type Settings = typeof ai.defaultSettings;
+const instances: { [key: number]: { api: OpenAIApi, settings: Settings } } = {};
 
-export default new OpenAIApi(configuration);
-
-export function getSettings(chatId: number) {
-  return { ...ai.defaultSettings, ...settings[chatId] };
+export function createInstance(chatId: number, key: string) {
+  instances[chatId] = {
+    api: new OpenAIApi(new Configuration({ apiKey: key })),
+    settings: { ...config.chatCompletionSettings },
+  };
 }
 
-export function setSetting(chatId: number, settingId: keyof Settings, value: any) {
-  settings[chatId] = {
-    ...settings[chatId],
+export function destroyInstance(chatId: number) {
+  delete instances[chatId];
+}
+
+export function getInstance(chatId: number) {
+  return instances[chatId]?.api;
+}
+
+export function getSettings(chatId: number) {
+  return instances[chatId].settings ?? null;
+}
+
+export function setSetting(chatId: number, settingId: keyof Settings, value: string|number) {
+  instances[chatId].settings = {
+    ...instances[chatId].settings,
     [settingId]: value
   };
 }
