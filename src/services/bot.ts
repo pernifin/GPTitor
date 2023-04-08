@@ -1,27 +1,50 @@
-import TelegramBot from 'node-telegram-bot-api';
+import TelegramBot, { Message } from 'node-telegram-bot-api';
 import dbg from 'debug';
+import axios from 'axios';
 
-import { tg } from '../config.js';
-import commands from '../commands/index.js';
+import commands, { startCommand, defaultCommand } from '../commands/index.js';
 import { callMenuAction } from '../services/menu.js';
+import { getInstance, destroyInstance } from './openai.js';
 
-const debug = dbg('bot:handlers');
-const { BOT_TOKEN = '', BOT_TOKEN_STAGE = '' } = process.env;
+const debug = dbg('bot:init');
+const logError = dbg('bot:error:*');
+let botUser: TelegramBot.User;
 
-export function start() {
-  const bot = new TelegramBot(process.env.NODE_ENV === 'production' ? BOT_TOKEN : BOT_TOKEN_STAGE, tg.options);
+function getBotCommand(msg: Message) {
+  const commandEntity = msg.entities?.find(entity => entity.type === 'bot_command' && entity.offset === 0);
+  if (commandEntity) {
+    const [command, botname] = msg.text!.substring(1, commandEntity.length).split('@');
+    if (!botname || botname.toLowerCase() === botUser.username?.toLowerCase()) {
+      return command;
+    }
+  }
+
+  return null;
+}
+
+export async function start(token: string) {
+  const bot = new TelegramBot(token, { polling: true });
+
+  await bot.setMyCommands(
+    commands.map(cmd => ({ command: cmd.name, description: cmd.description }))
+  );
 
   // bot.setWebHook('GPTitor', {
   //   certificate: './ssl/crt.pem'
   // });
-  
-  bot.onText(/^\/(\w+)(?:\s.+)?$/, (msg, match) => {
-    const cmdName = match?.[1] as keyof typeof commands;
-    const command = commands[cmdName];
 
-    debug('Incoming command "%s"', cmdName);
-    if (command) {
-      command(bot, msg);
+  bot.on('text', async (msg) => {
+    const openai = getInstance(msg.chat.id);
+    const command = openai ? (getBotCommand(msg) || defaultCommand) : startCommand;
+    const action = commands.find(cmd => cmd.name === command)?.action;
+
+    if (action) {
+      debug('Incoming command "%s"', command);
+      try {
+        await action(bot, msg);
+      } catch (error) {
+        handleError(bot, msg, error);
+      }
     }
   });
 
@@ -31,7 +54,28 @@ export function start() {
     await callMenuAction(query);
   });
 
-  bot.on('text', (msg) => commands.answer(bot, msg));
-
   bot.on('error', (error) => debug('Bot error "%O"', error));
+
+  botUser = await bot.getMe();
+  debug('Started bot %o', botUser);
+
+  return botUser;
+}
+
+export function getBotUser() {
+  return botUser;
+}
+
+export async function handleError(bot: TelegramBot, msg: Message, error: unknown) {
+  if (axios.isAxiosError(error)) {
+    if (error.response?.data?.error.code === 'invalid_api_key') {
+      destroyInstance(msg.chat.id);
+      debug(error.response?.data?.error);
+      await bot.sendMessage(msg.chat.id, error.response?.data?.error.message);
+    } else {
+      logError(error.response?.data?.error ?? error);
+    }
+  } else if (error instanceof Error) {
+    logError(error.message ?? error);
+  }
 }

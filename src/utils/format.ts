@@ -11,5 +11,5 @@ export function capitalize(str: string) {
 }
 
 export function getCleanMessage(msg: string) {
-  return msg.replace(/(^|\s)([/@]\w+(?=\s|\/|@|$))+/gm, '');
+  return msg.replace(/(^|\s)([/@]\w+(?=\s|\/|@|$))+/gm, '').trim();
 }

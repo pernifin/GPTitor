@@ -1,15 +1,13 @@
-import axios from 'axios';
+import TelegramBot, { Message } from 'node-telegram-bot-api';
+import { ChatCompletionRequestMessage } from 'openai';
 import dbg from 'debug';
 
-import openai, { getSettings } from '../services/openai.js';
-import { tg } from '../config.js';
+import config from '../config.js';
+import { getSettings, getInstance } from '../services/openai.js';
+import { getBotUser } from '../services/bot.js';
 import { escapeReponse, getCleanMessage } from '../utils/format.js';
 
-import type { ChatCompletionRequestMessage } from 'openai';
-import type TelegramBot from 'node-telegram-bot-api';
-import type { Message } from 'node-telegram-bot-api';
-
-const conversations: { 
+const conversations: {
   [key: number]: {
     [key: number]: {
       msgId: number,
@@ -23,14 +21,11 @@ const conversations: {
 const debug = dbg('bot:answer');
 
 function hasBotMention(msg: Message) {
+  const botname = getBotUser().username?.toLowerCase();
   return msg.entities?.some(entity =>
     entity.type === 'mention'
-    && msg.text!.substring(entity.offset + 1, entity.offset + entity.length).toLowerCase() === tg.botName.toLowerCase()
+    && msg.text!.substring(entity.offset + 1, entity.offset + entity.length).toLowerCase() === botname
   );
-}
-
-function hasBotCommand(msg: Message) {
-  return msg.entities?.some(entity => entity.type === 'bot_command');
 }
 
 function isReplyToAnswer(msg: Message) {
@@ -39,6 +34,11 @@ function isReplyToAnswer(msg: Message) {
 
 function shouldAnswer(msg: Message) {
   return msg.chat.type === 'private' || hasBotMention(msg) || isReplyToAnswer(msg);
+}
+
+function getChoiceNumber(index: number): string {
+  return (index > 9 ? getChoiceNumber(Math.floor(index / 10)) : '')
+    + String.fromCharCode(0x0031 + index % 10, 0x20e3, 0x20);
 }
 
 function getQuestion(msg: Message) {
@@ -54,13 +54,11 @@ function getQuestion(msg: Message) {
 }
 
 function getConversation(msg: Message) {
-  const { systemMessage } = getSettings(msg.chat.id);
   const conversation: ChatCompletionRequestMessage[] = [];
   let replyId = msg.reply_to_message?.message_id;
 
-  if (replyId && !conversations[msg.chat.id]?.[replyId] && msg.reply_to_message !== null && msg.reply_to_message?.text !== null) {
+  if (replyId && !conversations[msg.chat.id]?.[replyId]) {
     conversation.unshift(
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       { role: 'user', content: msg.reply_to_message?.text! },
     );
   }
@@ -74,8 +72,8 @@ function getConversation(msg: Message) {
     replyId = replyTo;
   }
 
-  if (systemMessage) {
-    conversation.unshift({ role: 'system', content: systemMessage });
+  if (config.systemMessage) {
+    conversation.unshift({ role: 'system', content: config.systemMessage });
   }
 
   return conversation;
@@ -95,7 +93,7 @@ function saveReply(msg: Message, reply: Message, question: string, answer: strin
 }
 
 export default async function(bot: TelegramBot, msg: Message) {
-  if (hasBotCommand(msg) || !shouldAnswer(msg)) {
+  if (!shouldAnswer(msg)) {
     return;
   }
 
@@ -106,32 +104,23 @@ export default async function(bot: TelegramBot, msg: Message) {
   if (question) {
     messages.push({ role: 'user', content: question });
   }
-  
+
   if (messages.length === 0 || messages[messages.length - 1].role === 'assistant') {
     return;
   }
 
-  try {
-    const { model, temperature } = getSettings(msg.chat.id);
-    const { data: { choices } } = await openai.createChatCompletion({ 
-      model, temperature, messages
-    });
+  const { data: { choices } } = await getInstance(msg.chat.id).createChatCompletion({
+    ...getSettings(msg.chat.id), messages
+  });
 
-    const answer = choices.map((choice, index) => 
-        `${choices.length > 1 ? String.fromCharCode(0x0031 + index, 0x20e3, 0x20): ''}${choice.message?.content}`
-      )
-      .join('\n\n');
+  const answer = choices
+    .map((choice, index) => `${choices.length > 1 ? getChoiceNumber(index) : ''}${choice.message?.content}`)
+    .join('\n\n');
 
-    const reply = await bot.sendMessage(msg.chat.id, escapeReponse(answer), { 
-      parse_mode: 'MarkdownV2',
-      reply_to_message_id: isReplyToAnswer(msg) ? msg.message_id : undefined
-    });
-    saveReply(msg, reply, question ?? messages[messages.length - 1].content, answer);
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error(error.response?.data?.error ?? error);
-    } else if (error instanceof Error) {
-      console.error(error.message ?? error);
-    }
-  }
+  const reply = await bot.sendMessage(msg.chat.id, escapeReponse(answer), {
+    parse_mode: 'MarkdownV2',
+    reply_to_message_id: isReplyToAnswer(msg) ? msg.message_id : undefined
+  });
+
+  saveReply(msg, reply, question ?? messages[messages.length - 1].content, answer);
 }
