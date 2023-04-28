@@ -1,6 +1,6 @@
 import TelegramBot, { Message } from 'node-telegram-bot-api';
 
-import { getInstance } from '../services/openai.js';
+import { createImage } from '../services/openai.js';
 import { getCleanMessage } from '../utils/format.js';
 
 export default async function(bot: TelegramBot, msg: Message) {
@@ -9,6 +9,6 @@ export default async function(bot: TelegramBot, msg: Message) {
     return;
   }
 
-  const image = await getInstance(msg.chat.id).createImage({ prompt });
-  await bot.sendPhoto(msg.chat.id, image.data.data[0].url!);
+  const image = await createImage(msg.chat.id, prompt);
+  await bot.sendPhoto(msg.chat.id, image.url!);
 }

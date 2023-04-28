@@ -1,5 +1,5 @@
 const specialChars = ['*', '[', ']', '(', ')', '+', '|', '{', '}', '.'].map((char) => `\\${char}`)
-const regularChars = ['_', '~', '(?<!`)`(?!`)', '>', '#', '-', '=', '!'].join('|');
+const regularChars = ['_', '~', '>', '#', '-', '=', '!'].join('|');
 const regex = new RegExp(specialChars.concat(regularChars).join('|'), 'gm');
 
 export function escapeReponse(message: string|number) {

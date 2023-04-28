@@ -3,69 +3,31 @@ import { ChatCompletionRequestMessage } from 'openai';
 import dbg from 'debug';
 
 import config from '../config.js';
-import { getSettings, getInstance } from '../services/openai.js';
-import { getBotUser } from '../services/bot.js';
+import { createChatCompletion, createImage, updateQuota } from '../services/openai.js';
 import { escapeReponse, getCleanMessage } from '../utils/format.js';
 
-const conversations: {
-  [key: number]: {
-    [key: number]: {
-      msgId: number,
-      question: string,
-      answer: string,
-      replyTo?: number
-    }
-  }
-} = {};
+const conversations: Record<number, Record<number, {
+  msgId: number,
+  question: string,
+  answer: string,
+  replyTo?: number
+}>> = {};
 
 const debug = dbg('bot:answer');
 
-function hasBotMention(msg: Message) {
-  const botname = getBotUser().username?.toLowerCase();
-  return msg.entities?.some(entity =>
-    entity.type === 'mention'
-    && msg.text!.substring(entity.offset + 1, entity.offset + entity.length).toLowerCase() === botname
-  );
-}
-
-function isReplyToAnswer(msg: Message) {
-  return Boolean(msg.reply_to_message && conversations[msg.chat.id]?.[msg.reply_to_message?.message_id]);
-}
-
-function shouldAnswer(msg: Message) {
-  return msg.chat.type === 'private' || hasBotMention(msg) || isReplyToAnswer(msg);
-}
-
-function getChoiceNumber(index: number): string {
-  return (index > 9 ? getChoiceNumber(Math.floor(index / 10)) : '')
-    + String.fromCharCode(0x0031 + index % 10, 0x20e3, 0x20);
-}
-
-function getQuestion(msg: Message) {
-  switch (msg.chat.type) {
-    case 'private':
-      return getCleanMessage(msg.text!);
-    case 'group':
-    case 'supergroup':
-      return hasBotMention(msg) || isReplyToAnswer(msg) ? getCleanMessage(msg.text!) : null;
-    default:
-      return null;
-  }
-}
-
 function getConversation(msg: Message) {
-  const conversation: ChatCompletionRequestMessage[] = [];
+  const messages: ChatCompletionRequestMessage[] = [];
   let replyId = msg.reply_to_message?.message_id;
 
   if (replyId && !conversations[msg.chat.id]?.[replyId]) {
-    conversation.unshift(
+    messages.unshift(
       { role: 'user', content: msg.reply_to_message?.text! },
     );
   }
 
   while (replyId && conversations[msg.chat.id]?.[replyId]) {
     const { question, answer, replyTo } = conversations[msg.chat.id][replyId];
-    conversation.unshift(
+    messages.unshift(
       { role: 'user', content: question },
       { role: 'assistant', content: answer }
     );
@@ -73,10 +35,10 @@ function getConversation(msg: Message) {
   }
 
   if (config.systemMessage) {
-    conversation.unshift({ role: 'system', content: config.systemMessage });
+    messages.unshift({ role: 'system', content: config.systemMessage });
   }
 
-  return conversation;
+  return messages;
 }
 
 function saveReply(msg: Message, reply: Message, question: string, answer: string) {
@@ -92,35 +54,55 @@ function saveReply(msg: Message, reply: Message, question: string, answer: strin
   };
 }
 
+function callUntil<T>(toCall: () => void, until: Promise<T>, interval = 5000) {
+  const timer = setInterval(toCall, interval);
+  toCall();
+
+  return until.then((result) => {
+    clearInterval(timer);
+    return result;
+  });
+}
+
 export default async function(bot: TelegramBot, msg: Message) {
-  if (!shouldAnswer(msg)) {
-    return;
+  if (!updateQuota(msg.chat.id)) {
+    return await bot.sendMessage(msg.chat.id, config.userQuota.exceedMessage);
   }
 
   debug('Incoming question in "%s"', msg.chat.title || msg.chat.username || msg.chat.first_name);
-  const question = getQuestion(msg);
+  const question = getCleanMessage(msg.text!);
   const messages = getConversation(msg);
 
   if (question) {
     messages.push({ role: 'user', content: question });
   }
 
-  if (messages.length === 0 || messages[messages.length - 1].role === 'assistant') {
+  if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
     return;
   }
 
-  const { data: { choices } } = await getInstance(msg.chat.id).createChatCompletion({
-    ...getSettings(msg.chat.id), messages
+  const choices = await callUntil(
+    () => bot.sendChatAction(msg.chat.id, 'typing'),
+    createChatCompletion(msg.chat.id, messages)
+  );
+
+  choices.forEach(async (choice) => {
+    const answer = choice.message?.content!;
+
+    if (answer.startsWith('image:')) {
+      const image = await callUntil(
+        () => bot.sendChatAction(msg.chat.id, 'upload_photo'),
+        createImage(msg.chat.id, answer.split(':')[1])
+      );
+
+      return await bot.sendPhoto(msg.chat.id, image.url!);
+    }
+
+    const reply = await bot.sendMessage(msg.chat.id, escapeReponse(answer), {
+      parse_mode: 'MarkdownV2',
+      reply_to_message_id: msg.reply_to_message ? msg.message_id : undefined
+    });
+
+    saveReply(msg, reply, question ?? messages[messages.length - 1].content, answer);
   });
-
-  const answer = choices
-    .map((choice, index) => `${choices.length > 1 ? getChoiceNumber(index) : ''}${choice.message?.content}`)
-    .join('\n\n');
-
-  const reply = await bot.sendMessage(msg.chat.id, escapeReponse(answer), {
-    parse_mode: 'MarkdownV2',
-    reply_to_message_id: isReplyToAnswer(msg) ? msg.message_id : undefined
-  });
-
-  saveReply(msg, reply, question ?? messages[messages.length - 1].content, answer);
 }
