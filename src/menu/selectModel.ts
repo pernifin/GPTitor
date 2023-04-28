@@ -6,9 +6,9 @@ import { setActiveMenu, buildButtonRow } from '../services/menu.js';
 import setModel from './setModel.js';
 
 export default (bot: TelegramBot) => async (query: CallbackQuery) => {
-  const response = await getInstance(query.message?.chat.id!).listEngines();
+  const response = await getInstance().listEngines();
   const subMenu = response.data.data
-    .filter(engine => engine.ready && config.whitelistModels.includes(engine.id))
+    .filter(engine => engine.ready && Object.keys(config.models).includes(engine.id))
     .map(engine => ({
       id: `model:${engine.id}`,
       text: engine.id,
