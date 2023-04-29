@@ -40,6 +40,7 @@ function getBotCommand(msg: Message) {
 
 export async function startBot(token: string) {
   const bot = new TelegramBot(token, { polling: true });
+  botUser = await bot.getMe();
 
   await bot.setMyCommands(
     commands
@@ -81,7 +82,7 @@ export async function startBot(token: string) {
 
   bot.on('error', (error) => debug('Bot error "%O"', error));
 
-  botUser = await bot.getMe();
+  
   debug('Started bot %o', botUser);
 
   return botUser;
