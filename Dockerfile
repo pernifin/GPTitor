@@ -5,6 +5,5 @@ WORKDIR /app
 
 ADD ./ ./
 RUN npm install
-RUN npm run build
 
-ENTRYPOINT [ "npm", "run", "launch" ]
+ENTRYPOINT [ "npm", "start" ]
