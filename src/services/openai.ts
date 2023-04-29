@@ -56,7 +56,7 @@ export function getQuota(chatId: number) {
 function consumeQuota(chatId: number, model: string, baseValue: number) {
   const userQuota = users[chats[chatId].addedBy];
 
-  userQuota.tokens -= baseValue * config.models[model] * config.userQuota.multiplier;
+  userQuota.tokens -= Math.ceil(baseValue * config.models[model] * config.userQuota.multiplier);
   userQuota.lastRequestAt = Date.now();
 }
 
