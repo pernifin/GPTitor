@@ -1,9 +1,7 @@
-import TelegramBot, { Message } from 'node-telegram-bot-api';
+import type { Context } from "telegraf";
 
-import { activate } from '../services/openai.js';
-import config from '../config.js';
+import config from '../config';
 
-export default async function(bot: TelegramBot, msg: Message) {
-  activate(msg);
-  return bot.sendMessage(msg.chat.id, config.greeting);
+export default async function(ctx: Context) {
+  return ctx.reply(config.greeting);
 }

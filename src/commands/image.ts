@@ -1,14 +1,16 @@
-import TelegramBot, { Message } from 'node-telegram-bot-api';
+import type { Message } from "typegram";
 
-import { createImage } from '../services/openai.js';
-import { getCleanMessage } from '../utils/format.js';
+import Conversation from '../services/Conversation';
 
-export default async function(bot: TelegramBot, msg: Message) {
-  const prompt = getCleanMessage(msg.text!);
+import type { BotContext } from "../bot";
+
+export default async function(ctx: BotContext) {
+  const msg = ctx.message as Message.TextMessage;
+  const prompt = Conversation.getCleanMessage(msg.text!);
   if (!prompt) {
     return;
   }
 
-  const image = await createImage(msg.chat.id, prompt);
-  await bot.sendPhoto(msg.chat.id, image.url!);
+  const image = await ctx.openai.createImage(ctx, prompt);
+  return ctx.sendPhoto(image.url!);
 }
