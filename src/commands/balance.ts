@@ -1,13 +1,11 @@
-import TelegramBot, { Message } from 'node-telegram-bot-api';
+import config from '../config';
 
-import config from '../config.js';
-import { getQuota } from '../services/openai.ts';
+import type { BotContext } from "../bot";
 
-export default async function(bot: TelegramBot, msg: Message) {
+export default async function(ctx: BotContext) {
   const { dailyTokens, startTokens } = config.userQuota;
-  const message = `
-    You have ${getQuota(msg.chat.id)} tokens left. You receive ${dailyTokens} 
+  const message = `You have ${ctx.quota.tokens} tokens left. You receive ${dailyTokens} 
 tokens once in a day if your balance is less than ${startTokens}.`;
   
-  return bot.sendMessage(msg.chat.id, message);
+  return ctx.reply(message);
 }

@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "gptitor",
+    "prod": "gptitor"
+  },
+  "targets": {},
+  "etags": {}
+}

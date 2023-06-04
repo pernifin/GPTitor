@@ -1,14 +1,12 @@
 {
   "compilerOptions": {
-    "module": "es2022",
-    "moduleResolution": "node16",
-    "target": "es2021",
+    "module": "NodeNext",
+    "target": "ESNext",
 
+    "allowJs": true,
     "strict": true,
-    "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "allowImportingTsExtensions": true,
     "noEmit": true
   },
   "ts-node": {
@@ -16,6 +14,6 @@
     "esm": true
   },
   "extends": "ts-node/node16/tsconfig.json",
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "api/**/*"],
   "exclude": ["node_modules", "**/*.spec.ts"]
 }

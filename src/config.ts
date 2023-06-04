@@ -8,13 +8,16 @@ export default {
   } as Record<ModelName, number>,
   creativityLevels: { '0.0': 'None', '0.3': 'Deterministic', '0.7': 'Moderate', '1.1': 'High', '1.6': 'Extreme' },
   systemMessage: [
-    'Wrap every piece of code that you generate in three backticks (`).',
+    'Always wrap every multiline block of code that you generate in <pre> tag, inline code should be wrapped in <code> tag, remove leading line breaks and trailing spaces, replace markdown style with html tags',
     'If you are asked to generate an image, then instead of a negative response, transform the user\'s request into a concise prompt in English, add "image:" in front of it and return it as a response'
   ].join('\n'),
-  chatCompletionSettings: {
+  maxCompletions: 5,
+  defaultSettings: {
     model: 'gpt-3.5-turbo' as ModelName,
     temperature: 0.7,
-    n: 1,
+    completions: 1,
+    persist: false,
+    maxTokens: 2048
   },
   userQuota: {
     startTokens: 10000,
