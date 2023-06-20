@@ -1,7 +1,10 @@
 import { MongoClient } from "mongodb";
 
-const client = new MongoClient(process.env.MONGO_URL!);
+if (!process.env.MONGO_URL) {
+  throw new Error("MONGO_URL is not set");
+}
 
+const client = new MongoClient(process.env.MONGO_URL!);
 export const createStore = <T>(botname: string, collectionName: string) => {
   const database = client.db(botname);
   const collection = database.collection(collectionName);

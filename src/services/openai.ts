@@ -47,7 +47,7 @@ export default class OpenAI {
     // @ts-expect-error path does not exist
     audio.path = "conversation.mp3";
 
-    const { data: { text } } = await this.api.createTranscription(audio, "whisper-1");
+    const { data: { text } } = await this.api.createTranscription(audio as unknown as File, "whisper-1");
     this.ctx.quota.consume("whisper-1", duration / 60);
 
     return text; 
