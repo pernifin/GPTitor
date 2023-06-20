@@ -1,4 +1,6 @@
-FROM node:lts-bullseye-slim
+FROM node:hydrogen-bullseye-slim
+
+RUN apt-get update && apt-get -y install ffmpeg
 
 RUN mkdir /app
 WORKDIR /app

@@ -1,7 +1,7 @@
-import { Message } from 'telegraf/types';
-import { ChatCompletionRequestMessage } from "openai";
+import { type Message } from 'telegraf/types';
+import { type ChatCompletionRequestMessage } from "openai";
 
-import { type Store } from "../bot";
+import config from "../config";
 
 type Dialog = {
   question: string,
@@ -10,32 +10,30 @@ type Dialog = {
 };
 
 export default class Conversation {
-  constructor(private store: Store<Dialog>, private botUsername: string) { }
+  dialogs = new Map<string, Dialog>();
 
-  private async loadDialog(chatId: number, replyId: number): Promise<Dialog | undefined> {
-    return this.store.get(`${chatId}/${replyId}`);
+  private loadDialog(chatId: number, replyId: number): Dialog | undefined {
+    return this.dialogs.get(`${chatId}/${replyId}`);
   }
 
-  private async saveDialog(chatId: number, replyId: number, dialog: Dialog) {
-    return this.store.set(`${chatId}/${replyId}`, dialog);
+  private saveDialog(chatId: number, replyId: number, dialog: Dialog) {
+    return this.dialogs.set(`${chatId}/${replyId}`, dialog);
   }
 
-  static getCleanMessage(msg: string) {
+  getCleanMessage(msg: string) {
     return msg.replace(/(^|\s)([/@]\w+(?=\s|\/|@|$))+/gm, '').trim();
   }
 
-  async load(msg: Message.TextMessage) {
+  load(msg: Message.TextMessage) {
     const conversation: ChatCompletionRequestMessage[] = [];
 
     if (msg.reply_to_message) {
-      let { message_id: replyId } = msg.reply_to_message;
-      let dialog = await this.loadDialog(msg.chat.id, replyId);
+      let dialog = this.loadDialog(msg.chat.id, msg.reply_to_message.message_id);
 
       // When there is no dialog stored, use the reply message
       if (!dialog && "text" in msg.reply_to_message) {
-        const fromBot = msg.reply_to_message.from?.username === this.botUsername;
         conversation.push({
-          role: fromBot ? "assistant" : "user",
+          role: msg.reply_to_message.from?.is_bot ? "assistant" : "user",
           content: msg.reply_to_message.text
         });
       }
@@ -47,20 +45,28 @@ export default class Conversation {
           { role: "assistant", content: dialog.answer }
         );
 
-        dialog = dialog.replyTo ? await this.loadDialog(msg.chat.id, dialog.replyTo) : undefined;
+        dialog = dialog.replyTo ? this.loadDialog(msg.chat.id, dialog.replyTo) : undefined;
       }
     }
 
-    const question = Conversation.getCleanMessage(msg.text!);
+    const question = this.getCleanMessage(msg.text!);
     if (question) {
       conversation.push({ role: "user", content: question });
+    }
+
+    if (conversation.length === 0 || conversation[conversation.length - 1].role !== "user") {
+      return [];
+    }
+
+    if (config.systemMessage) {
+      conversation.unshift({ role: "system", content: config.systemMessage });
     }
 
     return conversation;
   }
 
-  async save(msg: Message.TextMessage, reply: Message.TextMessage, question: string, answer: string) {
-    return this.saveDialog(msg.chat.id, reply.message_id, {
+  save(msg: Message.TextMessage, reply: Message.TextMessage, question: string, answer: string) {
+    this.saveDialog(msg.chat.id, reply.message_id, {
       question,
       answer,
       replyTo: msg.reply_to_message?.message_id

@@ -24,6 +24,10 @@ export default class Quota {
     return this.userQuota.tokens;
   }
 
+  get isExceeded() {
+    return this.userQuota.tokens < 100; // Some minimum tokens
+  }
+
   refresh() {
     const { startTokens, dailyTokens } = config.userQuota;
     const { tokens, lastRefreshAt } = this.userQuota;
@@ -35,8 +39,8 @@ export default class Quota {
     }
   }
 
-  consume(model: string, baseValue: number) {
-    this.userQuota.tokens -= Math.ceil(baseValue * config.models[model] * config.userQuota.multiplier);
+  consume(model: keyof typeof config.prices, baseValue: number) {
+    this.userQuota.tokens -= Math.ceil(baseValue * config.prices[model] * config.userQuota.multiplier);
     this.userQuota.lastRequestAt = Date.now();
   }
 }
