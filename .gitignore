@@ -5,3 +5,4 @@ temp/
 dist/
 .vercel
 *-debug.log
+.DS_Store

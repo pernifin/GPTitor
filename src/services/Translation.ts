@@ -16,7 +16,7 @@ export default class Translation {
         throw new Error(`Language file not found: ${lang}.js`);
       }
 
-      strings[lang] = (await import(`../lang/${lang}.js`)).default;
+      strings[lang] = (await import(`../lang/${lang}.js`)).default.default;
     }
 
     return new Translation(strings);
