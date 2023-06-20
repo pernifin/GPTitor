@@ -1,12 +1,12 @@
 import type { BotSession } from '../bot';
-import config from '../config';
+import config, { type ModelName } from '../config';
 
 export type ChatSettings = typeof config.defaultSettings;
 
 export default class Settings {
   private chatSettings: ChatSettings;
 
-  constructor(session: BotSession) {
+  constructor(private session: BotSession) {
     this.chatSettings = session.chatSettings ??= { ...config.defaultSettings };
   }
 
@@ -14,7 +14,21 @@ export default class Settings {
     return this.chatSettings;
   }
 
-  setModel(model: string) {
+  fix() {
+    const { model, temperature } = this.chatSettings;
+    const needToReset = !config.models[model]
+      || !config.modes[temperature.toFixed(1) as keyof typeof config.modes];
+
+    if (needToReset) {
+      this.reset();
+    }
+  }
+
+  reset() {
+    this.chatSettings = this.session.chatSettings = { ...config.defaultSettings };
+  }
+
+  setModel(model: ModelName) {
     if (config.models[model]) {
       this.chatSettings.model = model;
     }
@@ -30,9 +44,5 @@ export default class Settings {
     if (completions >= 1 && completions <= config.maxCompletions) {
       this.chatSettings.completions = completions;
     }
-  }
-
-  setPersist(persist: boolean) {
-    this.chatSettings.persist = persist;
   }
 }

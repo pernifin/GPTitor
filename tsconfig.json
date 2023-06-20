@@ -7,7 +7,9 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": true
+    "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true
   },
   "ts-node": {
     "files": true,
