@@ -39,14 +39,15 @@ export type BotContext = Context & {
 
 export type BotOptions = {
   domain: string,
-  path?: string,
+  path: string,
   createStore?: <T>(botname: string, collectionName: string) => Store<T>;
   logger?: (...args: any[]) => void;
   isDev?: boolean;
 };
 
 export default class Bot extends Telegraf<BotContext> {
-  services?: {
+  private webhook?: Awaited<ReturnType<typeof Telegraf.prototype.createWebhook>>;
+  private botServices?: {
     translation: Translation;
     conversation: Conversation;
     midjourney: Midjourney;
@@ -60,20 +61,26 @@ export default class Bot extends Telegraf<BotContext> {
     });
   }
 
+  get services() {
+    return this.botServices;
+  }
+
+  handle(...args: Parameters<Awaited<ReturnType<typeof Telegraf.prototype.createWebhook>>>) {
+    return this.webhook ? this.webhook(...args) : args[2]?.();
+  }
+
   async run(options: BotOptions) {
     const { DISCORD_SERVER_ID, DISCORD_CHANNEL_ID, DISCORD_SALAI_TOKEN } = process.env;
     const {
       domain,
-      path = "/bot",
+      path,
       createStore = <T>() => new MemorySessionStore() as unknown as Store<T>,
       logger = console.log,
       isDev = true
     } = options;
-  
-    // ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
     this.botInfo = await this.telegram.getMe();
-    this.services = {
+    this.botServices = {
       translation: await Translation.create(),
       conversation: new Conversation(),
       ffmpeg: ffmpeg,
@@ -85,10 +92,10 @@ export default class Bot extends Telegraf<BotContext> {
       })
     };
 
-    await this.services.midjourney.init();
+    await this.botServices.midjourney.init();
 
-    for (const lang of this.services.translation.langs) {
-      const $t = this.services.translation.get(lang);
+    for (const lang of this.botServices.translation.langs) {
+      const $t = this.botServices.translation.get(lang);
       await this.telegram.setMyCommands(
         definitions.map((cmd) => ({ ...cmd, description: $t(cmd.description) })),
         { language_code: lang }
@@ -109,8 +116,8 @@ export default class Bot extends Telegraf<BotContext> {
       services(this),
       stage.middleware()
     );
-  
-    return this.createWebhook({
+
+    this.webhook = await this.createWebhook({
       secret_token: this.telegram.token.replace(":", "-"),
       domain,
       path

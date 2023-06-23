@@ -6,6 +6,11 @@ import actions from "../scenes/dialog/actions";
 export type BotFunction = (ctx: BotContext, args: object) => Promise<string | void>;
 
 export async function generateImage(ctx: BotContext, { prompt }: { prompt: string }) {
+  const hasNonAscii = prompt.split("").some((char) => char.charCodeAt(0) > 127)
+  if (hasNonAscii) {
+    prompt = await ctx.openai.translateMessage(prompt);
+  }
+
   await actions.generate(ctx, prompt);
 }
 

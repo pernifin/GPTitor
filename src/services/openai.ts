@@ -22,7 +22,7 @@ export default class OpenAI {
       temperature: settings.temperature,
       n: settings.completions,
       // max_tokens: settings.maxTokens
-      functions: settings.functions
+      functions: config.functions
     };
 
     try {
@@ -51,6 +51,29 @@ export default class OpenAI {
     this.ctx.quota.consume("whisper-1", duration / 60);
 
     return text; 
+  }
+
+  async translateMessage(text: string) {
+    const settings = this.ctx.settings.current;
+    const messages: ChatCompletionRequestMessage[] = [
+      { role: "system", content: config.translationRequest },
+      { role: "user", content: text }
+    ];
+
+    debug("translate message %o", messages);
+    const { data } = await this.api.createChatCompletion({ 
+      messages,
+      model: settings.model,
+      temperature: 0
+    });
+
+    debug("Translation result %o", data);
+
+    if (data.usage?.total_tokens) {
+      this.ctx.quota.consume(settings.model, data.usage.total_tokens / 1000);
+    }
+
+    return data.choices[0].message?.content ?? "";
   }
 
   async getModels(returnAll = false) {
