@@ -10,14 +10,16 @@ import { format, callUntil } from "../../utils";
 const debug = d("bot:dialog");
 
 export function shouldReact(ctx: BotContext) {
-  const msg = ctx.message as Message.TextMessage;
+  const msg = ctx.message as Message.TextMessage & Message.CaptionableMessage;
   if (msg.chat.type === "private") {
     return true;
   }
 
-  const hasBotMention = msg.entities?.some(entity =>
+  const entities = msg.entities || msg.caption_entities || [];
+  const text = msg.text || msg.caption || "";
+  const hasBotMention = entities.some(entity =>
     entity.type === "mention"
-    && msg.text!.substring(entity.offset + 1, entity.offset + entity.length).toLowerCase() === ctx.me.toLowerCase()
+    && text.substring(entity.offset + 1, entity.offset + entity.length).toLowerCase() === ctx.me.toLowerCase()
   );
 
   if (hasBotMention) {
