@@ -34,5 +34,7 @@ export default {
     // "Chaos:        {{midjourney.chaos}}",
     "```"
   ].join("\n"),
-  "reset.message": "Settings have been reset to defaults"
+  "reset.message": "Settings have been reset to defaults",
+
+  "quota.exceed": "You have exceeded the request limit for today. Try again tomorrow."
 }

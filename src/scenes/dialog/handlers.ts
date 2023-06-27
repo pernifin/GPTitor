@@ -61,7 +61,7 @@ export async function onText(ctx: BotContext) {
   }
 
   if (ctx.quota.isExceeded) {
-    return ctx.sendMessage(config.userQuota.exceedMessage);
+    return ctx.sendMessage(ctx.$t('quota.exceed'));
   }
 
   return answer(ctx, conversation);
