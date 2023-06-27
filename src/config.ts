@@ -14,9 +14,9 @@ const config = {
   prices,
   modes: { "0.1": "Strict", "0.7": "Flexible", "1.2": "Creative", "1.7": "Extreme" },
   systemMessage: [
-    // "Always wrap every multiline block of code that you generate in <pre> tag, inline code should be wrapped in <code> tag, remove leading line breaks and trailing spaces, replace markdown style with html tags",
-    "Wrap every piece of code that you generate in three backticks (`).",
-    // "If you are asked to generate an image, then instead of a negative response, transform the user\"s request into a concise prompt in English, add 'image:' in front of it and return it as a response"
+    "You are an AI assistant who has access to all the knowledge of mankind. The user asks you to explain something. Always politely and briefly answer his questions. If the answer requires clarification, ask a question. Communicate in a friendly tone, but always short and to the point.",
+    "Generate code only if the user explicitly requested it, or if the code is an integral part of the explanation.",
+    "Always wrap code blocks with three backticks (`)"
   ].join("\n"),
   translationRequest: "Translate following user's message into English",
   maxCompletions: 5,
@@ -54,7 +54,6 @@ const config = {
     startTokens: 10000,
     dailyTokens: 1000,
     multiplier: 100, // We use 0.01 cent as a bot token
-    exceedMessage: "Вы превысили лимит запросов на сегодня. Попробуйте завтра снова."
   },
   langs: {
     default: "en",

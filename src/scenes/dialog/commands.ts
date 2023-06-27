@@ -4,10 +4,9 @@ import type { BotContext } from "../../bot";
 import config from '../../config';
 
 export const definitions = [
-  { command: "start", description: "command.start" },
-  { command: "settings", description: "command.settings" },
-  { command: "balance", description: "command.balance" },
   { command: "help", description: "command.help" },
+  { command: "settings", description: "command.settings" },
+  { command: "balance", description: "command.balance" }
 ] as BotCommand[];
 
 export default {

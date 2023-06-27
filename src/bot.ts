@@ -118,9 +118,10 @@ export default class Bot extends Telegraf<BotContext> {
     );
 
     this.webhook = await this.createWebhook({
-      secret_token: this.telegram.token.replace(":", "-"),
       domain,
-      path
+      path,
+      allowed_updates: ["message", "callback_query"],
+      secret_token: Math.floor(Date.now() * Math.random() * 1000).toString()
     });
   }
 }

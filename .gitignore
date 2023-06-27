@@ -4,5 +4,6 @@ ssl/
 temp/
 dist/
 .vercel
-*-debug.log
+debug.log
 .DS_Store
+snapshots/

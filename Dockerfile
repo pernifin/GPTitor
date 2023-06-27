@@ -1,6 +1,6 @@
 FROM node:hydrogen-bullseye-slim
 
-RUN apt-get update && apt-get -y install ffmpeg
+RUN apt-get update && apt-get -y install ffmpeg && apt-get clean
 
 RUN mkdir /app
 WORKDIR /app
