@@ -16,7 +16,7 @@ const host = RAILWAY_STATIC_URL || process.argv[2];
 const log = fs.createWriteStream("./debug.log", { flags: "a" });
 
 if (!host) {
-  throw new Error("Missing host");
+  throw new Error("Missing host. Provide '-- <host>' as the last argument");
 }
 
 app.post("/bot", async (request, response, next) => {
@@ -25,8 +25,8 @@ app.post("/bot", async (request, response, next) => {
   try {
     await bot.handle(request, response, next);
   } catch (error) {
-    debug("Error handle update", error, request.body);
-    log.write(`Error: ${JSON.stringify(error)}\nRequest: ${request.body}`, "utf-8");
+    debug("Error handle update", (error as Error).message, request.body, (error as any).response?.data);
+    log.write(`Error: ${JSON.stringify(error, null, 2)}\nRequest: ${request.body}`, "utf-8");
   }
 });
 
@@ -41,5 +41,5 @@ app.listen(PORT || 3000, async () => {
     isDev: NODE_ENV !== "production"
   });
 
-  debug("Bot server started on port 3000");
+  debug(`${bot.botInfo?.username} server started on port ${PORT || 3000}`);
 });

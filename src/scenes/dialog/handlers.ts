@@ -3,7 +3,6 @@ import { type ChatCompletionRequestMessage } from "openai";
 import d from "debug";
 
 import { type BotContext } from "../../bot";
-import config from "../../config";
 import functions from "../../functions";
 import { format, callUntil } from "../../utils";
 
