@@ -62,4 +62,4 @@ export default function(bot: Bot) {
   });
 
   return router;
-};
+}

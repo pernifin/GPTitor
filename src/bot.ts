@@ -5,7 +5,9 @@ import { definitions } from "./scenes/dialog/commands";
 import settingsScene from "./scenes/settings";
 import dialogScene, { DIALOG_SCENE_ID } from "./scenes/dialog";
 import {
-  services, OpenAI, Quota, Settings, Translation, Conversation, Midjourney, type UserQuota, type ChatSettings
+  services,
+  OpenAI, Quota, Settings, Translation, Conversation, Midjourney,
+  type Generation, type UserQuota, type ChatSettings
 } from "./services";
 
 export type Store<T> = {
@@ -21,6 +23,7 @@ export type SceneState = Scenes.SceneSessionData & {
 export type BotSession = Scenes.SceneSession<SceneState> & {
   userQuota?: UserQuota;
   chatSettings?: ChatSettings;
+  imageGenerations?: Record<string, Generation>;
 };
 
 export type BotContext = Context & {
@@ -50,7 +53,6 @@ export default class Bot extends Telegraf<BotContext> {
   private botServices?: {
     translation: Translation;
     conversation: Conversation;
-    midjourney: Midjourney;
     ffmpeg: typeof ffmpeg;
   };
 
@@ -83,16 +85,8 @@ export default class Bot extends Telegraf<BotContext> {
     this.botServices = {
       translation: await Translation.create(),
       conversation: new Conversation(),
-      ffmpeg: ffmpeg,
-      midjourney: new Midjourney({
-        ServerId: DISCORD_SERVER_ID!,
-        ChannelId: DISCORD_CHANNEL_ID!,
-        SalaiToken: DISCORD_SALAI_TOKEN!,
-        Debug: isDev
-      })
+      ffmpeg: ffmpeg
     };
-
-    await this.botServices.midjourney.init();
 
     for (const lang of this.botServices.translation.langs) {
       const $t = this.botServices.translation.get(lang);
@@ -108,7 +102,7 @@ export default class Bot extends Telegraf<BotContext> {
     );
 
     this.use(
-      isDev ? Telegraf.log(logger) : Telegraf.passThru(),
+      Telegraf.log(logger), // isDev ? Telegraf.log(logger) : Telegraf.passThru(),
       session({
         store: createStore(this.botInfo.username, "session"),
         defaultSession: () => ({ __scenes: { state: {} } })

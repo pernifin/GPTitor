@@ -1,53 +1,52 @@
 import { Markup } from "telegraf";
 import { type Message } from "typegram";
-import sharp from "sharp";
-import fetch from "node-fetch";
 
+import { type GeneratedImage } from "../../services/Midjourney";
 import type { BotContext } from "../../bot";
 import { callUntil } from "../../utils";
 
-const range4 = Array(4).fill(null).map((_, i) => i);
+const iconNum = (i: number) => String.fromCharCode(0x0030 + i, 0xfe0f, 0x20e3);
+const makeBtnRow = (image: GeneratedImage, action: string, icon: string) =>
+  Array.from({ length: 4 }, (n, i) => Markup.button.callback(
+    `${icon}${iconNum(i + 1)}`,
+    `${action}:${image.indexHashes[i]}`
+  ));
 
-async function splitImage(imageUrl: string) {
-  const imageBuffer = await fetch(imageUrl).then(response => response.arrayBuffer());
-  const size = (await sharp(imageBuffer).metadata()).width! / 2;
-  return Promise.all(
-    range4.map(
-      (i) => sharp(imageBuffer)
-        .extract({ left: (i % 2) * size, top: Math.floor(i / 2) * size, width: size, height: size })
-        .toBuffer()
-    )
-  );
-}
+const generationKeyboard = (ctx: BotContext, image: GeneratedImage) => {
+  const btns = [
+    ...makeBtnRow(image, "variate", "🔄"),
+    ...makeBtnRow(image, "upscale", "⏫️")
+  ];
 
-async function sendSingle(ctx: BotContext, imageUrl: string, hash: string, payload?: string) {
-  return ctx.sendPhoto(imageUrl, Markup.inlineKeyboard([
-    range4.map((i) =>
-      Markup.button.callback(`🔄${String.fromCharCode(0x0031 + i, 0xfe0f, 0x20e3)}`, `variate:${hash}-${i + 1}`)
-    ),
+  return Markup.inlineKeyboard([
+    btns.filter((_, i) => !Math.floor(i % 4 / 2)),
+    btns.filter((_, i) => Math.floor(i % 4 / 2)),
     [
-      Markup.button.callback(ctx.$t("action.split"), `split:${hash}`),
-      Markup.button.callback(ctx.$t("action.regenerate"), payload ? `variate:${payload}` : `regenerate:${hash}`),
+      Markup.button.callback(
+        ctx.$t("action.regenerate"),
+        `${image.type === "variation" ? 'variate' : 'regenerate'}:${image.hash}`
+      )
     ]
-  ]));
-}
+  ]);
+};
+const upscaleKeyboard = (ctx: BotContext, image: GeneratedImage) => Markup.inlineKeyboard([
+  [
+    Markup.button.callback(ctx.$t("action.variateHigh"), `outpaint:${image.hash}-high`),
+    Markup.button.callback(ctx.$t("action.variateLow"), `outpaint:${image.hash}-low`),
+  ],
+  [
+    Markup.button.callback(ctx.$t("action.outpaint20"), `outpaint:${image.hash}-2x`),
+    Markup.button.callback(ctx.$t("action.outpaint15"), `outpaint:${image.hash}-1.5x`),
+  ]
+]);
 
-async function sendMultiple(ctx: BotContext, imageUrl: string, hash: string) {
-  const buffers = await splitImage(imageUrl);
-  return Promise.all(
-    buffers.map((buffer, i) => ctx.sendPhoto({ source: buffer }, Markup.inlineKeyboard([
-      Markup.button.callback(ctx.$t("action.variate"), `variate:${hash}-${i + 1}`)
-    ])))
-  );
-}
-
-async function sendImage(ctx: BotContext, imageUrl: string, hash: string, payload?: string) {
-  const length = await fetch(imageUrl, { method: "HEAD" })
-    .then((response) => +response.headers.get("content-length")!);
-
-  return length > 1024 * 1024 * 5 // 5MB
-    ? sendMultiple(ctx, imageUrl, hash)
-    : sendSingle(ctx, imageUrl, hash, payload);
+async function sendImage(ctx: BotContext, imageWhen: Promise<GeneratedImage>) {
+  return imageWhen.then((image) => {
+    const keyboard = image.type === "upscale" ? upscaleKeyboard(ctx, image) : generationKeyboard(ctx, image);
+    return ctx.sendPhoto(image.image, keyboard);
+  }, (error) => {
+    return ctx.reply(error.message ?? ctx.$t("error.noimage"));
+  });
 }
 
 export default {
@@ -61,33 +60,27 @@ export default {
           prompt = `${link.href} ${prompt}`;
         }
 
-        const image = await ctx.midjourney.generate(prompt);
-        if (!image) {
-          return ctx.reply(ctx.$t("error.generate-image-failed"));
-        }
-
-        return sendImage(ctx, image.url, image.hash);
+        return sendImage(ctx, ctx.midjourney.generate(prompt));
       }
+    );
+  },
+
+  async upscale(ctx: BotContext, payload: string) {
+    return callUntil(
+      () => ctx.sendChatAction("upload_photo"),
+      async () => sendImage(ctx, ctx.midjourney.upscale(payload))
     );
   },
 
   async variate(ctx: BotContext, payload: string) {
     return callUntil(
       () => ctx.sendChatAction("upload_photo"),
-      async () => {
-        const [savedHash, index] = payload.split("-");
-        const image = await ctx.midjourney.variate(savedHash, +index);
-        if (!image) {
-          return ctx.reply(ctx.$t("error.generate-image-failed"));
-        }
-    
-        return sendImage(ctx, image.url, image.hash, payload);
-      }
+      async () => sendImage(ctx, ctx.midjourney.variate(payload))
     );
   },
 
   async regenerate(ctx: BotContext, hash: string) {
-    const { prompt } = ctx.midjourney.getResult(hash) ?? {};
+    const prompt = ctx.midjourney.getPrompt(hash);
     if (!prompt) {
       return ctx.reply(ctx.$t("error.image-not-found"));
     }
@@ -95,23 +88,12 @@ export default {
     return this.generate(ctx, prompt);
   },
 
-  async split(ctx: BotContext, hash: string) {
-    const result = ctx.midjourney.getResult(hash);
-    if (!result) {
-      return ctx.reply(ctx.$t("error.image-not-found"));
-    }
-
+  async outpaint(ctx: BotContext, hash: string) {
     return callUntil(
       () => ctx.sendChatAction("upload_photo"),
       async () => {
-        const buffers = await splitImage(result.imageUrl);
-        return ctx.sendMediaGroup(
-          buffers.map((buffer) => ({ 
-            type: "photo",
-            caption: result.prompt,
-            media: { source: buffer }
-          }))
-        );
+        const [generationHash, level] = hash.split("-");
+        return sendImage(ctx, ctx.midjourney.outpaint(generationHash, level as "high" | "low" | "2x" | "1.5x"));
       }
     );
   }

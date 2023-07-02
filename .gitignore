@@ -1,9 +1,10 @@
-node_modules/
 .env*
+debug.log
+.DS_Store
+node_modules/
+.clinic/
+snapshots/
+coverage/
 ssl/
 temp/
 dist/
-.vercel
-debug.log
-.DS_Store
-snapshots/

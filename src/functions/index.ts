@@ -21,12 +21,12 @@ export async function describeImage(ctx: BotContext) {
   }
 
   const link = await ctx.telegram.getFileLink(message.photo[0].file_id);
-  const description = await ctx.midjourney.describe(link.href);
-  if (!description) {
+  const descriptions = await ctx.midjourney.describe(link.href);
+  if (!descriptions) {
     return ctx.reply(ctx.$t("error.process-image-failed"));
   }
 
-  return description.map((text) => text.replace(/(--\w+ .*?)+$/, "")).join("\n\n");
+  return descriptions.map((text) => text.replace(/(--\w+ .*?)+$/, "")).join("\n\n");
 }
 
 export default {
