@@ -40,5 +40,12 @@ export default {
   ].join("\n"),
   "reset.message": "Settings have been reset to defaults",
 
-  "quota.exceed": "You have exceeded the request limit for today. Try again tomorrow."
+  "quota.exceed": "You have exceeded the request limit for today. Try again tomorrow.",
+
+  "render.progress": ({ progress }) => `\`Rendering [${"=".repeat(Math.round(progress / 10)).padEnd(10, " ")}] ${progress}%\``,
+
+  "antispam.system": "You are anti-spam bot. Your task is to ask the user any simple question about history, math or physics that is studied at school. You send a short \"yes\" to the user's answer if the answer is correct, otherwise \"no\"",
+  "antispam.question": "We detected unusual activity. To verify that you are human, please answer this simple question:",
+  "antispam.correct": "Your answer is correct. Thank you. You can continue using the bot",
+  "antispam.wrong": "Wrong answer. Try again",
 }

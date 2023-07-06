@@ -1,20 +1,17 @@
-import { Telegraf, Context, Scenes, session, MemorySessionStore } from "telegraf";
+import { Telegraf, Context, Scenes, session } from "telegraf";
+import { Update, CallbackQuery } from 'typegram';
 import ffmpeg from "fluent-ffmpeg";
 
 import { definitions } from "./scenes/dialog/commands";
 import settingsScene from "./scenes/settings";
+import antispamScene from "./scenes/antispam";
 import dialogScene, { DIALOG_SCENE_ID } from "./scenes/dialog";
 import {
   services,
-  OpenAI, Quota, Settings, Translation, Conversation, Midjourney,
-  type Generation, type UserQuota, type ChatSettings
+  Datastore, OpenAI, Quota, Settings, Translation, Conversation, Midjourney,
+  type UserQuota, type ChatSettings, type TokenList
 } from "./services";
-
-export type Store<T> = {
-  get: (name: string) => Promise<T | undefined>;
-  set: (name: string, value: T) => Promise<void>;
-  delete: (name: string) => Promise<void>;
-};
+import { antispam, queue } from "./middleware";
 
 export type SceneState = Scenes.SceneSessionData & {
   state: Record<string, any>;
@@ -23,12 +20,15 @@ export type SceneState = Scenes.SceneSessionData & {
 export type BotSession = Scenes.SceneSession<SceneState> & {
   userQuota?: UserQuota;
   chatSettings?: ChatSettings;
-  imageGenerations?: Record<string, Generation>;
+  antispamPrompt?: string;
 };
 
-export type BotContext = Context & {
+export type BotUpdate = Update.MessageUpdate & Update.CallbackQueryUpdate<CallbackQuery.DataQuery>;
+
+export type BotContext<U extends Update = Update> = Context & {
   session: BotSession;
   scene: Scenes.SceneContextScene<BotContext, SceneState>;
+  update: U;
 
   openai: OpenAI;
   quota: Quota;
@@ -37,19 +37,20 @@ export type BotContext = Context & {
   midjourney: Midjourney;
   ffmpeg: typeof ffmpeg;
   timestamp: number;
-  $t: (text: string, tokens?: Record<string, string | number>) => string;
+  host: string;
+  $t: (text: string, tokens?: TokenList) => string;
 };
 
 export type BotOptions = {
   domain: string,
   path: string,
-  createStore?: <T>(botname: string, collectionName: string) => Store<T>;
   logger?: (...args: any[]) => void;
   isDev?: boolean;
 };
 
 export default class Bot extends Telegraf<BotContext> {
   private webhook?: Awaited<ReturnType<typeof Telegraf.prototype.createWebhook>>;
+  public host?: string;
   private botServices?: {
     translation: Translation;
     conversation: Conversation;
@@ -76,17 +77,25 @@ export default class Bot extends Telegraf<BotContext> {
     const {
       domain,
       path,
-      createStore = <T>() => new MemorySessionStore() as unknown as Store<T>,
       logger = console.log,
       isDev = true
     } = options;
 
     this.botInfo = await this.telegram.getMe();
+    this.host = `https://${domain}`;
     this.botServices = {
       translation: await Translation.create(),
       conversation: new Conversation(),
       ffmpeg: ffmpeg
     };
+
+    await Datastore.init();
+    await Midjourney.init({
+      ServerId: DISCORD_SERVER_ID!,
+      ChannelId: DISCORD_CHANNEL_ID!,
+      SalaiToken: DISCORD_SALAI_TOKEN!,
+      Debug: true // isDev
+    });
 
     for (const lang of this.botServices.translation.langs) {
       const $t = this.botServices.translation.get(lang);
@@ -97,14 +106,16 @@ export default class Bot extends Telegraf<BotContext> {
     }
   
     const stage = new Scenes.Stage<BotContext>(
-      [dialogScene, settingsScene],
+      [dialogScene, settingsScene, antispamScene],
       { default: DIALOG_SCENE_ID }
     );
 
+    stage.use(queue(), antispam());
+
     this.use(
-      Telegraf.log(logger), // isDev ? Telegraf.log(logger) : Telegraf.passThru(),
+      isDev ? Telegraf.log(logger) : Telegraf.passThru(),
       session({
-        store: createStore(this.botInfo.username, "session"),
+        store: new Datastore("session"),
         defaultSession: () => ({ __scenes: { state: {} } })
       }),
       services(this),

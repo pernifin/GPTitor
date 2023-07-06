@@ -17,10 +17,13 @@ scene.settings(async (ctx) => ctx.scene.enter(SETTINGS_SCENE_ID));
 scene.help(async (ctx) => ctx.reply(ctx.$t("help")));
 Object.keys(commands).forEach((command) => scene.command(command, commands[command as keyof typeof commands]));
 
+scene.action(/.+/, async (ctx, next) => {
+  await ctx.answerCbQuery();
+  return next();
+});
+
 scene.action(/^(\w+)(?::(.+))?$/, async (ctx) => {
   const [, action, param] = ctx.match;
-
-  await ctx.answerCbQuery();
   if (actions[action as keyof typeof actions]) {
     await actions[action as keyof typeof actions](ctx, param);
   }

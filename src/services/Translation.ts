@@ -3,10 +3,12 @@ import { join } from "path";
 
 import config from "../config";
 
-type LangStrings = Record<string, Record<string, string>>;
+export type TokenList = Record<string, string | number>;
+type StringFunc = (tokens?: TokenList) => string;
+type LangStrings = Record<string, Record<string, string | StringFunc>>;
 
 export default class Translation {
-  private constructor(private strings: LangStrings) {}
+  private constructor(private strings: LangStrings) { }
 
   static async create() {
     const strings: LangStrings = {};
@@ -22,7 +24,11 @@ export default class Translation {
     return new Translation(strings);
   }
 
-  private replaceTokens(text: string, tokens?: Record<string, string | number>) {
+  private replaceTokens(text: string | StringFunc, tokens?: TokenList) {
+    if (typeof text === "function") {
+      return text(tokens);
+    }
+
     if (!tokens) {
       return text;
     }
@@ -38,7 +44,7 @@ export default class Translation {
   }
 
   get(lang: string) {
-    return (text: string, tokens?: Record<string, string | number>) =>
+    return (text: string, tokens?: TokenList) =>
       this.replaceTokens(this.strings[lang]?.[text] ?? `[[${text}]]`, tokens);
   }
 

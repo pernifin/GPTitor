@@ -76,6 +76,10 @@ async function answer(ctx: BotContext, conversation: ChatCompletionRequestMessag
   for (const choice of choices) {
     const { content, function_call } = choice.message ?? {};
 
+    if (choice.finish_reason === "error" && content) {
+      return ctx.replyWithMarkdownV2(format("`" + content + "`").join(""));
+    }
+
     if (function_call && functions[function_call.name!]) {
       let args = {};
       try {
