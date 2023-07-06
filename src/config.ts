@@ -58,6 +58,13 @@ const config = {
   langs: {
     default: "en",
     supported: ["en", "ru"] as const
+  },
+  antispam: {
+    requests: {
+      minute: 3,
+      hour: 10,
+      day: 30
+    }
   }
 };
 

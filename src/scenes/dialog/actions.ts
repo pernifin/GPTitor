@@ -1,9 +1,9 @@
 import { Markup } from "telegraf";
-import { type Message } from "typegram";
+import { type Message, type CallbackQuery, type InlineKeyboardMarkup, type InlineKeyboardButton } from "typegram";
 
 import { type GeneratedImage } from "../../services/Midjourney";
 import type { BotContext } from "../../bot";
-import { callUntil } from "../../utils";
+import { format, callUntil } from "../../utils";
 
 const iconNum = (i: number) => String.fromCharCode(0x0030 + i, 0xfe0f, 0x20e3);
 const makeBtnRow = (image: GeneratedImage, action: string, icon: string) =>
@@ -11,7 +11,6 @@ const makeBtnRow = (image: GeneratedImage, action: string, icon: string) =>
     `${icon}${iconNum(i + 1)}`,
     `${action}:${image.indexHashes[i]}`
   ));
-
 const generationKeyboard = (ctx: BotContext, image: GeneratedImage) => {
   const btns = [
     ...makeBtnRow(image, "variate", "🔄"),
@@ -39,48 +38,78 @@ const upscaleKeyboard = (ctx: BotContext, image: GeneratedImage) => Markup.inlin
     Markup.button.callback(ctx.$t("action.outpaint15"), `outpaint:${image.hash}-1.5x`),
   ]
 ]);
+const stubBtn = Markup.button.callback(" ", " ");
+
+const updateKeyboard = (markup: InlineKeyboardMarkup, replace: string) =>
+  Markup.inlineKeyboard(
+    markup.inline_keyboard.map((row) =>
+      row.map((btn) =>
+        (btn as InlineKeyboardButton.CallbackButton)?.callback_data === replace ? stubBtn : btn
+      )
+    )
+  ).reply_markup;
 
 async function sendImage(ctx: BotContext, imageWhen: Promise<GeneratedImage>) {
-  return imageWhen.then((image) => {
+  try {
+    const image = await imageWhen;
     const keyboard = image.type === "upscale" ? upscaleKeyboard(ctx, image) : generationKeyboard(ctx, image);
-    return ctx.sendPhoto(image.image, keyboard);
-  }, (error) => {
-    return ctx.reply(error.message ?? ctx.$t("error.noimage"));
-  });
+    return callUntil(
+      () => ctx.sendChatAction("upload_photo"),
+      ctx.sendPhoto(image.image, keyboard)
+    );
+  } catch (error: any) {
+    return ctx.sendMessage(error.message ?? ctx.$t("error.noimage"));
+  }
 }
+
+const trackProgress = async (ctx: BotContext, callback: (tracker: (progress: number) => void) => Promise<any>) => {
+  const renderProgress = (progress: number) => format(ctx.$t("render.progress", { progress })).join("");
+  const msg = await ctx.replyWithMarkdownV2(renderProgress(0));
+
+  await callback((progress: number) => {
+    progress > 0 && ctx.telegram.editMessageText(
+      msg.chat.id,
+      msg.message_id,
+      undefined,
+      renderProgress(progress),
+      { parse_mode: "MarkdownV2" }
+    );
+  });
+
+  ctx.deleteMessage(msg.message_id);
+};
 
 export default {
   async generate(ctx: BotContext, prompt: string) {
-    return callUntil(
-      () => ctx.sendChatAction("upload_photo"),
-      async () => {
-        const message = ctx.message as Message.PhotoMessage & Message.TextMessage;
-        if (message.photo) {
-          const link = await ctx.telegram.getFileLink(message.photo[0].file_id);
-          prompt = `${link.href} ${prompt}`;
-        }
-
-        return sendImage(ctx, ctx.midjourney.generate(prompt));
+    await trackProgress(ctx, (setProgress) => {
+      const message = (ctx.message || ctx.callbackQuery?.message) as Message.PhotoMessage & Message.TextMessage;
+      if (message.photo) {
+        prompt = `${ctx.host}/file/${message.photo[0].file_id}.png ${prompt}`;
       }
-    );
+
+      return sendImage(ctx, ctx.midjourney.generate(prompt, setProgress));
+    });
   },
 
   async upscale(ctx: BotContext, payload: string) {
-    return callUntil(
+    const { message, data }: { message?: Message.CommonMessage, data: string } =
+      (ctx.callbackQuery as CallbackQuery.DataQuery);
+    if (message?.reply_markup && data) {
+      await ctx.editMessageReplyMarkup(updateKeyboard(message.reply_markup, data));
+    }
+
+    await callUntil(
       () => ctx.sendChatAction("upload_photo"),
-      async () => sendImage(ctx, ctx.midjourney.upscale(payload))
+      sendImage(ctx, ctx.midjourney.upscale(payload))
     );
   },
 
   async variate(ctx: BotContext, payload: string) {
-    return callUntil(
-      () => ctx.sendChatAction("upload_photo"),
-      async () => sendImage(ctx, ctx.midjourney.variate(payload))
-    );
+    await trackProgress(ctx, (setProgress) => sendImage(ctx, ctx.midjourney.variate(payload, setProgress)));
   },
 
   async regenerate(ctx: BotContext, hash: string) {
-    const prompt = ctx.midjourney.getPrompt(hash);
+    const prompt = await ctx.midjourney.getPrompt(hash);
     if (!prompt) {
       return ctx.reply(ctx.$t("error.image-not-found"));
     }
@@ -89,12 +118,12 @@ export default {
   },
 
   async outpaint(ctx: BotContext, hash: string) {
-    return callUntil(
-      () => ctx.sendChatAction("upload_photo"),
-      async () => {
-        const [generationHash, level] = hash.split("-");
-        return sendImage(ctx, ctx.midjourney.outpaint(generationHash, level as "high" | "low" | "2x" | "1.5x"));
-      }
-    );
+    await trackProgress(ctx, (setProgress) => {
+      const [generationHash, level] = hash.split("-");
+      return sendImage(
+        ctx,
+        ctx.midjourney.outpaint(generationHash, level as "high" | "low" | "2x" | "1.5x", setProgress)
+      );
+    });
   }
 } as const;

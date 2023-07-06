@@ -3,8 +3,10 @@ import sharp from "sharp";
 import d from "debug";
 
 import { type BotContext } from "../bot";
+import type Datastore from "./Datastore";
 
 const debug = d("bot:midjourney");
+const noop = () => {};
 
 type MidjourneyConfig = {
   ServerId: string,
@@ -31,92 +33,101 @@ export type GeneratedImage = Generation & {
 }
 
 export default class Midjourney {
-  private client: MJClient;
-  private gens: Record<string, Generation> = {};
-
-  constructor(config: MidjourneyConfig, private ctx: BotContext) {
+  private static client: MJClient;
+  static async init(config: MidjourneyConfig) {
     this.client = new MJClient({
       ...config,
       Ws: true
     });
 
-    this.gens = ctx.session.imageGenerations ??= {};
-  }
-
-  async init() {
     await this.client.Connect();
   }
 
-  close() {
+  static close() {
     this.client.Close();
   }
 
-  getPrompt(hash: string) {
-    const [generationHash] = hash.split("-");
-    return this.gens[generationHash]?.prompt;
+  constructor(private ctx: BotContext, private store: Datastore) {
+    if (!Midjourney.client) {
+      throw new Error("Midjourney is not initialized");
+    }
   }
 
-  async createGeneration(image: MJMessage, prompt: string, type: GenerationType): Promise<GeneratedImage> {
+  async getPrompt(hash: string) {
+    const [generationHash] = hash.split("-");
+    return (await this.store.get<Generation>(generationHash))?.prompt;
+  }
+
+  async hasUpscale(hash: string) {
+    const [generationHash] = hash.split("-");
+    const gen = await this.store.get<Generation>(generationHash);
+
+    return gen?.type === "upscale";
+  }
+
+  async createGeneration(msg: MJMessage, prompt: string, type: GenerationType, onFinish = noop) {
     const hash = `${Date.now()}${Math.floor(Math.random() * 10000)}`;
-    this.gens[hash] = {
+    const gen = {
       type,
       prompt,
       hash,
       indexHashes: type !== "upscale" ? Array.from({ length: 4 }, (n, i) => `${hash}-${i + 1}`) : [],
       request: {
-        msgId: image.id!,
-        hash: image.hash!,
-        flags: image.flags
+        msgId: msg.id!,
+        hash: msg.hash!,
+        flags: msg.flags
       }
     };
 
-    return {
-      image: await this.adjustImage(image.uri),
-      ...this.gens[hash]
-    };
+    await this.store.set(hash, gen);
+    const image = await this.adjustImage(msg.uri);
+
+    onFinish();
+    return { image, ...gen } as GeneratedImage;
   }
 
-  async generate(prompt: string) {
-    const image = await this.client.Imagine(prompt);
+  async generate(prompt: string, tracker: (progress: number) => void = noop) {
+    const image = await Midjourney.client.Imagine(prompt, this.getLoader(tracker));
     if (!image) {
       throw new Error(this.ctx.$t("error.generate-image-failed"));
     }
-    return this.createGeneration(image, prompt, "generation");
+
+    return this.createGeneration(image, prompt, "generation", () => tracker(100));
   }
 
-  async upscale(hash: string) {
-    const { prompt, ...request } = this.buildRequest(hash);
-    const image = await this.client.Upscale(request);
+  async upscale(hash: string, tracker: (progress: number) => void = noop) {
+    const { prompt, ...request } = await this.buildRequest(hash, tracker);
+    const image = await Midjourney.client.Upscale(request);
     if (!image) {
       throw new Error(this.ctx.$t("error.generate-image-failed"));
     }
-    return this.createGeneration(image, prompt, "upscale");
+    return this.createGeneration(image, prompt, "upscale", () => tracker(100));
   }
 
-  async outpaint(hash: string, level: "2x" | "1.5x" | "high" | "low") {
-    const { prompt, ...request } = this.buildRequest(hash);
-    const image = await this.client.ZoomOut({ level, ...request });
+  async outpaint(hash: string, level: "2x" | "1.5x" | "high" | "low", tracker: (progress: number) => void = noop) {
+    const { prompt, ...request } = await this.buildRequest(hash, tracker);
+    const image = await Midjourney.client.ZoomOut({ level, ...request });
     if (!image) {
       throw new Error(this.ctx.$t("error.generate-image-failed"));
     }
-    return this.createGeneration(image, prompt, "generation");
+    return this.createGeneration(image, prompt, "generation", () => tracker(100));
   }
 
-  async variate(hash: string) {
-    const { prompt, ...request } = this.buildRequest(hash);
-    const image = await this.client.Variation(request);
+  async variate(hash: string, tracker: (progress: number) => void = noop) {
+    const { prompt, ...request } = await this.buildRequest(hash, tracker);
+    const image = await Midjourney.client.Variation(request);
     if (!image) {
       throw new Error(this.ctx.$t("error.generate-image-failed"));
     }
-    return this.createGeneration(image, prompt, "variation");
+    return this.createGeneration(image, prompt, "variation", () => tracker(100));
   }
 
   async describe(imageUrl: string) {
-    return this.client.Describe(imageUrl).then((result) => result?.descriptions);
+    return Midjourney.client.Describe(imageUrl).then((result) => result?.descriptions);
   }
 
   async simplify(prompt: string) {
-    return this.client.Shorten(prompt);
+    return Midjourney.client.Shorten(prompt);
   }
 
   private async adjustImage(imageUrl: string) {
@@ -135,17 +146,22 @@ export default class Midjourney {
     return imageUrl;
   }
 
-  private buildRequest(hash: string) {
+  private async buildRequest(hash: string, tracker: (progress: number) => void) {
     const [generationHash, index] = hash.split("-");
-    if (!this.gens[generationHash]) {
+    const generation = await this.store.get<Generation>(generationHash);
+    if (!generation) {
       throw new Error(this.ctx.$t("error.image-not-found"));
     }
 
-    const { request, prompt } = this.gens[generationHash];
     return {
+      loader: this.getLoader(tracker),
       index: +index as 1 | 2 | 3 | 4,
-      ...request,
-      prompt,
+      prompt: generation.prompt,
+      ...generation.request
     };
+  }
+
+  private getLoader(tracker: (progress: number) => void) {
+    return (uri: string, progress: string) => tracker(parseInt(progress, 10));
   }
 }

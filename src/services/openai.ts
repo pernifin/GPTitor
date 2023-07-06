@@ -1,4 +1,4 @@
-import { Configuration, OpenAIApi, ChatCompletionRequestMessage } from "openai";
+import { Configuration, OpenAIApi, ChatCompletionRequestMessage, CreateChatCompletionResponseChoicesInner } from "openai";
 import { Readable } from "stream";
 import d from "debug";
 
@@ -14,7 +14,9 @@ export default class OpenAI {
     this.api = new OpenAIApi(new Configuration({ apiKey: key }));
   }
 
-  async createChatCompletion(messages: ChatCompletionRequestMessage[]) {
+  async createChatCompletion(messages: ChatCompletionRequestMessage[])
+    : Promise<CreateChatCompletionResponseChoicesInner[]> 
+  {
     const settings = this.ctx.settings.current;
     const request = { 
       messages,
@@ -38,7 +40,11 @@ export default class OpenAI {
       return data.choices;
     } catch (error) {
       debug("createChatCompletion error", (error as any).response?.data ?? (error as Error).message);
-      return [];
+
+      const message = (error as any).response?.data?.error?.message;
+      return message
+        ? [{ message: { content: message, role: "system" }, finish_reason: "error" }]
+        : [];
     }
   }
 
@@ -74,6 +80,35 @@ export default class OpenAI {
     }
 
     return data.choices[0].message?.content ?? "";
+  }
+
+  async antispamPrompt() {
+    const { data } = await this.api.createChatCompletion({ 
+      messages: [{ role: "system", content: this.ctx.$t("antispam.system") }],
+      model: this.ctx.settings.current.model,
+      temperature: 1.1
+    });
+
+    debug("Antispam prompt %o", data.choices[0]);
+
+    return data.choices[0].message?.content ?? "";
+  }
+
+  async checkAntispam(question: string, answer: string) {
+    const prompt: ChatCompletionRequestMessage[] = [
+      { role: "system", content: this.ctx.$t("antispam.system") },
+      { role: "assistant", content: question },
+      { role: "user", content: answer }
+    ];
+
+    const { data } = await this.api.createChatCompletion({ 
+      messages: prompt,
+      model: this.ctx.settings.current.model,
+      temperature: 0
+    });
+
+    debug("Antispam check %o", data.choices[0]);
+    return data.choices[0].message?.content?.toLowerCase() === "yes";
   }
 
   async getModels(returnAll = false) {
