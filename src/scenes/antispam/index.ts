@@ -6,7 +6,20 @@ import { callUntil } from "../../utils";
 
 export const ANTISPAM_SCENE_ID = "antispam";
 
-const scene = new Scenes.BaseScene<BotContext>(ANTISPAM_SCENE_ID);
+const scene = new Scenes.BaseScene<BotContext>(
+  ANTISPAM_SCENE_ID,
+  {
+    ttl: 60 * 60, // 1 hour
+    handlers: [],
+    enterHandlers: [],
+    leaveHandlers: []
+  }
+);
+
+scene.command("reset", async (ctx) => {
+  delete ctx.session.antispamPrompt;
+  return ctx.scene.reenter();
+});
 
 scene.enter(async (ctx) => {
   if (ctx.session.antispamPrompt) {

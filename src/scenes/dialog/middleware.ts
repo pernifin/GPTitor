@@ -1,8 +1,9 @@
+import type { Message } from "typegram";
 import d from "debug";
 
-import { BotContext, BotUpdate } from "../bot";
-import config from "../config";
-import { ANTISPAM_SCENE_ID } from "../scenes/antispam";
+import { BotContext, BotUpdate } from "../../bot";
+import config from "../../config";
+import { ANTISPAM_SCENE_ID } from "../antispam";
 
 const debug = d("bot:middleware");
 
@@ -67,5 +68,26 @@ export function queue() {
 
     // Cleanup
     promises.delete(currentUserId);
+  };
+}
+
+export function shouldReact() {
+  return async (ctx: BotContext, next: () => Promise<void>) => {
+    const msg = ctx.message as Message.TextMessage & Message.CaptionableMessage;
+    if (msg.chat.type === "private") {
+      return next();
+    }
+
+    const entities = msg.entities || msg.caption_entities || [];
+    const text = msg.text || msg.caption || "";
+    const isReplyToBot = msg.reply_to_message?.from?.username?.toLowerCase() === ctx.me.toLowerCase();
+    const hasBotMention = entities.some(entity =>
+      entity.type === "mention"
+      && text.substring(entity.offset + 1, entity.offset + entity.length).toLowerCase() === ctx.me.toLowerCase()
+    );
+
+    if (hasBotMention || isReplyToBot) {
+      return next();
+    }
   };
 }

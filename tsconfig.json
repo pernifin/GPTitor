@@ -7,8 +7,8 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
-    "isolatedModules": true
+    "isolatedModules": false,
+    "outDir": "./dist"
   },
   "ts-node": {
     "files": true,
