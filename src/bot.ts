@@ -9,9 +9,8 @@ import dialogScene, { DIALOG_SCENE_ID } from "./scenes/dialog";
 import {
   services,
   Datastore, OpenAI, Quota, Settings, Translation, Conversation, Midjourney,
-  type UserQuota, type ChatSettings, type TokenList
+  type UserQuota, type ChatSettings, type Translator
 } from "./services";
-import { antispam, queue } from "./middleware";
 
 export type SceneState = Scenes.SceneSessionData & {
   state: Record<string, any>;
@@ -38,7 +37,7 @@ export type BotContext<U extends Update = Update> = Context & {
   ffmpeg: typeof ffmpeg;
   timestamp: number;
   host: string;
-  $t: (text: string, tokens?: TokenList) => string;
+  $t: Translator;
 };
 
 export type BotOptions = {
@@ -84,7 +83,7 @@ export default class Bot extends Telegraf<BotContext> {
     this.botInfo = await this.telegram.getMe();
     this.host = `https://${domain}`;
     this.botServices = {
-      translation: await Translation.create(),
+      translation: new Translation(),
       conversation: new Conversation(),
       ffmpeg: ffmpeg
     };
@@ -94,23 +93,21 @@ export default class Bot extends Telegraf<BotContext> {
       ServerId: DISCORD_SERVER_ID!,
       ChannelId: DISCORD_CHANNEL_ID!,
       SalaiToken: DISCORD_SALAI_TOKEN!,
-      Debug: true // isDev
+      Debug: isDev
     });
 
-    for (const lang of this.botServices.translation.langs) {
-      const $t = this.botServices.translation.get(lang);
+    for (const lang of this.botServices.translation.supportedLangs) {
+      const $t = this.botServices.translation.getTranslator(lang);
       await this.telegram.setMyCommands(
         definitions.map((cmd) => ({ ...cmd, description: $t(cmd.description) })),
         { language_code: lang }
       );
     }
-  
+
     const stage = new Scenes.Stage<BotContext>(
       [dialogScene, settingsScene, antispamScene],
       { default: DIALOG_SCENE_ID }
     );
-
-    stage.use(queue(), antispam());
 
     this.use(
       isDev ? Telegraf.log(logger) : Telegraf.passThru(),

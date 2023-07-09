@@ -8,24 +8,13 @@ import { format, callUntil } from "../../utils";
 
 const debug = d("bot:dialog");
 
-export function shouldReact(ctx: BotContext) {
-  const msg = ctx.message as Message.TextMessage & Message.CaptionableMessage;
-  if (msg.chat.type === "private") {
-    return true;
-  }
+export async function onPhoto(ctx: BotContext, next: () => Promise<void>) {
+  const message = ctx.message as Message.PhotoMessage & Message.TextMessage;
 
-  const entities = msg.entities || msg.caption_entities || [];
-  const text = msg.text || msg.caption || "";
-  const hasBotMention = entities.some(entity =>
-    entity.type === "mention"
-    && text.substring(entity.offset + 1, entity.offset + entity.length).toLowerCase() === ctx.me.toLowerCase()
-  );
+  message.photo = [message.photo.sort((photoA, photoB) => photoB.file_size! - photoA.file_size!)[0]];
+  message.text = message.caption ?? "";
 
-  if (hasBotMention) {
-    return true;
-  }
-
-  return Boolean(msg.reply_to_message?.from?.username?.toLowerCase() === ctx.me.toLowerCase());
+  return next();
 }
 
 export async function onVoice(ctx: BotContext, next: () => Promise<void>) {

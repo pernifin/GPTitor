@@ -1,5 +1,4 @@
 import Bot, { type BotContext } from "../bot";
-import config from "../config";
 
 import Datastore from "./Datastore";
 import OpenAI from "./OpenAI";
@@ -13,7 +12,7 @@ export { default as Quota, type UserQuota } from "./Quota";
 export { default as Settings, type ChatSettings } from "./Settings";
 export { default as Conversation } from "./Conversation";
 export { default as Midjourney, type Generation, type GeneratedImage } from "./Midjourney";
-export { default as Translation, type TokenList } from "./Translation";
+export { default as Translation, type Translator } from "./Translation";
 
 export function services(bot: Bot) {
   const { OPENAI_KEY } = process.env;
@@ -30,11 +29,7 @@ export function services(bot: Bot) {
     ctx.settings = new Settings(ctx.session);
     ctx.timestamp = Date.now();
     ctx.host = bot.host!;
-    ctx.$t = translation.get(
-      translation.hasSupport(ctx.from?.language_code!) 
-        ? ctx.from?.language_code!
-        : config.langs.default
-    );
+    ctx.$t = translation.getTranslator(ctx.from?.language_code!);
 
     await next();
   }

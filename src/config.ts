@@ -55,10 +55,7 @@ const config = {
     dailyTokens: 1000,
     multiplier: 100, // We use 0.01 cent as a bot token
   },
-  langs: {
-    default: "en",
-    supported: ["en", "ru"] as const
-  },
+  defaultLang: "en" as const,
   antispam: {
     requests: {
       minute: 3,

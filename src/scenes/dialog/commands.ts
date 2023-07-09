@@ -1,13 +1,11 @@
-import { type BotCommand } from "typegram";
-
 import type { BotContext } from "../../bot";
-import config from '../../config';
+import config from "../../config";
 
 export const definitions = [
   { command: "help", description: "command.help" },
   { command: "settings", description: "command.settings" },
   { command: "balance", description: "command.balance" }
-] as BotCommand[];
+] as const;
 
 export default {
   async balance(ctx: BotContext) {
