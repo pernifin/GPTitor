@@ -44,10 +44,11 @@ scene.enter(async (ctx) => {
 
 scene.action(/^(\w+)(?::(.+))?$/, async (ctx) => {
   const [, action, param] = ctx.match;
+  const actionHandler = actions[action as keyof typeof actions];
 
   await ctx.answerCbQuery();
-  if (actions[action as keyof typeof actions]) {
-    await actions[action as keyof typeof actions](ctx, param as any);
+  if (actionHandler) {
+    await actionHandler(ctx, param);
   }
 });
 

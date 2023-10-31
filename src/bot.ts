@@ -89,12 +89,12 @@ export default class Bot extends Telegraf<BotContext> {
     };
 
     await Datastore.init();
-    await Midjourney.init({
-      ServerId: DISCORD_SERVER_ID!,
-      ChannelId: DISCORD_CHANNEL_ID!,
-      SalaiToken: DISCORD_SALAI_TOKEN!,
-      Debug: isDev
-    });
+    // await Midjourney.init({
+    //   ServerId: DISCORD_SERVER_ID!,
+    //   ChannelId: DISCORD_CHANNEL_ID!,
+    //   SalaiToken: DISCORD_SALAI_TOKEN!,
+    //   Debug: isDev
+    // });
 
     for (const lang of this.botServices.translation.supportedLangs) {
       const $t = this.botServices.translation.getTranslator(lang);

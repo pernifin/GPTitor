@@ -12,7 +12,7 @@ export default {
   async model(ctx: BotContext) {
     const models = await ctx.openai.getModels();
 
-    return ctx.editMessageReplyMarkup(Markup.inlineKeyboard(
+    await ctx.editMessageReplyMarkup(Markup.inlineKeyboard(
       models.map(model => Markup.button.callback(model, `selectModel:${model}`)),
       { columns: 3 }
     ).reply_markup);
@@ -30,7 +30,7 @@ export default {
       .sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
       .map(([id, label]) => Markup.button.callback(label, `setTemperature:${id}`));
 
-    return ctx.editMessageReplyMarkup(Markup.inlineKeyboard(buttons, { columns: 2 }).reply_markup);
+    await ctx.editMessageReplyMarkup(Markup.inlineKeyboard(buttons, { columns: 2 }).reply_markup);
   },
 
   async setTemperature(ctx: BotContext, selectedLevel: string) {
@@ -57,4 +57,4 @@ export default {
 
   //   return ctx.scene.reenter();
   // }
-} as const;
+} as Record<string, (ctx: BotContext, param?: string) => Promise<void>>;
