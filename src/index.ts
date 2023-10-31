@@ -1,6 +1,7 @@
 import "dotenv/config";
 import * as fs from "fs";
 import express from "express";
+import { type AxiosError } from 'axios';
 import d from "debug";
 
 import Bot from "./bot";
@@ -29,7 +30,7 @@ app.post("/bot", async (request, response, next) => {
       (error as Error).message,
       (error as Error).stack,
       request.body,
-      (error as any).response?.data
+      (error as AxiosError).response?.data
     );
     log.write(`Error: ${JSON.stringify(error, null, 2)}\nRequest: ${request.body}`, "utf-8");
   }

@@ -1,4 +1,10 @@
-import { Configuration, OpenAIApi, ChatCompletionRequestMessage, CreateChatCompletionResponseChoicesInner } from "openai";
+import { 
+  Configuration, 
+  OpenAIApi, 
+  ChatCompletionRequestMessage, 
+  CreateChatCompletionResponseChoicesInner
+} from "openai";
+import { type AxiosError } from 'axios';
 import { Readable } from "stream";
 import d from "debug";
 
@@ -39,9 +45,9 @@ export default class OpenAI {
     
       return data.choices;
     } catch (error) {
-      debug("createChatCompletion error", (error as any).response?.data ?? (error as Error).message);
+      debug("createChatCompletion error", (error as AxiosError).response?.data ?? (error as Error).message);
 
-      const message = (error as any).response?.data?.error?.message;
+      const message = (error as AxiosError).response?.data?.error?.message;
       return message
         ? [{ message: { content: message, role: "system" }, finish_reason: "error" }]
         : [];

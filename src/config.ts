@@ -27,28 +27,28 @@ const config = {
     maxTokens: 4096
   },
   functions: [
-    {
-      name: "generateImage",
-      description: "Generate an image from a user's prompt. Can be called only when user explicitly asks for an image",
-      parameters: {
-        type: "object",
-        properties: {
-          prompt: {
-            type: "string",
-            description: "Clear and concise prompt string in English language without verbs that describes the image to be generated"
-          }
-        },
-        required: ["prompt"]
-      },
-    },
-    {
-      name: "describeImage",
-      description: "Describe in human readable format what is depicted on provided image",
-      parameters: {
-        type: "object",
-        properties: {}
-      }
-    }
+    // {
+    //   name: "generateImage",
+    //   description: "Generate an image from a user's prompt. Can be called only when user explicitly asks for an image",
+    //   parameters: {
+    //     type: "object",
+    //     properties: {
+    //       prompt: {
+    //         type: "string",
+    //         description: "Clear and concise prompt string in English language without verbs that describes the image to be generated"
+    //       }
+    //     },
+    //     required: ["prompt"]
+    //   },
+    // },
+    // {
+    //   name: "describeImage",
+    //   description: "Describe in human readable format what is depicted on provided image",
+    //   parameters: {
+    //     type: "object",
+    //     properties: {}
+    //   }
+    // }
   ],
   userQuota: {
     startTokens: 10000,

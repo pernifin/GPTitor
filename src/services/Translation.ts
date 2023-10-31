@@ -1,6 +1,5 @@
 import { default as en } from "../lang/en";
 import { default as ru } from "../lang/ru";
-import config from "../config";
 
 export type LangName = keyof typeof langs;
 export type LangStringKey = keyof typeof en;
@@ -13,11 +12,9 @@ export default class Translation {
     return Object.keys(langs) as LangName[];
   }
 
-  getTranslator(lang: string): Translator {
-    const strings = langs[lang as LangName] ?? langs[config.defaultLang];
-    // return new Translation(strings);
+  getTranslator(lang: LangName): Translator {
     return (key, tokens) => {
-      const text = strings[key];
+      const text = langs[lang][key];
       if (typeof text === "function") {
         return text(tokens as any);
       }

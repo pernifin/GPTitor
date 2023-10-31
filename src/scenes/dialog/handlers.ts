@@ -11,7 +11,7 @@ const debug = d("bot:dialog");
 export async function onPhoto(ctx: BotContext, next: () => Promise<void>) {
   const message = ctx.message as Message.PhotoMessage & Message.TextMessage;
 
-  message.photo = [message.photo.sort((photoA, photoB) => photoB.file_size! - photoA.file_size!)[0]];
+  message.photo = message.photo.sort((photoA, photoB) => photoB.file_size! - photoA.file_size!).slice(0, 0);
   message.text = message.caption ?? "";
 
   return next();
@@ -90,11 +90,8 @@ async function answer(ctx: BotContext, conversation: ChatCompletionRequestMessag
 
     if (content) {
       for (const answer of format(content)) {
-        const reply = await ctx.replyWithMarkdownV2(answer, {
-          reply_to_message_id: msg.reply_to_message ? msg.message_id : undefined
-        });
-    
-        ctx.conversation.save(msg, reply, conversation[conversation.length - 1].content!, answer);
+        const reply = await ctx.replyWithMarkdownV2(answer, { reply_to_message_id: msg.message_id });
+        ctx.conversation.save(msg, reply, conversation[conversation.length - 1].content!, content);
       }
     }
   }
