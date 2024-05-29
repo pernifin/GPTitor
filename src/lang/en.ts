@@ -9,11 +9,13 @@ export default {
 
   "balance.message": "You have {{tokens}} tokens left. You receive {{dailyTokens}} tokens once in a day if your balance is less than {{startTokens}}.",
 
+  "error.chat": "An error occurred while generating the answer:\n{{error}}",
   "error.noimage": "No image provided",
   "error.image-not-found": "Image not found",
   "error.process-image-failed": "Failed to process image",
   "error.generate-image-failed": "Failed to generate image",
 
+  "action.fullsize": "🖼️ Full size",
   "action.split": "🔢 Split",
   "action.regenerate": "🔁 Regenerate",
   "action.variate": "🔄 Variate",

@@ -1,5 +1,5 @@
 import { type Message } from 'telegraf/types';
-import { type ChatCompletionRequestMessage } from "openai";
+import OpenAIApi from "openai";
 
 import config from "../config";
 
@@ -25,7 +25,7 @@ export default class Conversation {
   }
 
   load(msg: Message.TextMessage) {
-    const conversation: ChatCompletionRequestMessage[] = [];
+    const conversation: OpenAIApi.ChatCompletionMessageParam[] = [];
 
     if (msg.reply_to_message) {
       let dialog = this.loadDialog(msg.chat.id, msg.reply_to_message.message_id);

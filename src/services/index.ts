@@ -1,11 +1,11 @@
 import Bot, { type BotContext } from "../bot";
 import config from "../config";
 
-import Datastore from "./Datastore";
+// import Datastore from "./Datastore";
 import OpenAI from "./OpenAI";
 import Quota from "./Quota";
 import Settings from "./Settings";
-import Midjourney from "./Midjourney";
+//import Midjourney from "./Midjourney";
 import { type LangName } from "./Translation";
 
 export { default as Datastore } from "./Datastore";
@@ -25,7 +25,7 @@ export function services(bot: Bot) {
     ctx.openai = new OpenAI(OPENAI_KEY!, ctx);
     ctx.conversation = conversation;
     ctx.ffmpeg = ffmpeg;
-    ctx.midjourney = new Midjourney(ctx, new Datastore("generations"));
+    // ctx.midjourney = new Midjourney(ctx, new Datastore("generations"));
 
     ctx.quota = new Quota(ctx.session);
     ctx.settings = new Settings(ctx.session);

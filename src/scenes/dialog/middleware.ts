@@ -1,4 +1,4 @@
-import type { Message } from "typegram";
+import type { Message } from "telegraf/types";
 import d from "debug";
 
 import { BotContext, BotUpdate } from "../../bot";

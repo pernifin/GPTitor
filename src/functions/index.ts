@@ -1,17 +1,33 @@
-import { type Message } from "typegram";
-
-import type { BotContext } from "../bot";
+import d from "debug";
+import { Markup } from "telegraf";
 import actions from "../scenes/dialog/actions";
+import { callUntil } from "../utils";
+
+import { type Message } from "telegraf/types";
+import type { BotContext } from "../bot";
+
+const debug = d("bot:functions");
 
 export type BotFunction = (ctx: BotContext, args: object) => Promise<string | void>;
 
 export async function generateImage(ctx: BotContext, { prompt }: { prompt: string }) {
-  const hasNonAscii = prompt.split("").some((char) => char.charCodeAt(0) > 127)
-  if (hasNonAscii) {
-    prompt = await ctx.openai.translateMessage(prompt);
+  try {
+    debug(`generateImage: ${prompt}`);
+    await callUntil(
+      () => ctx.sendChatAction("upload_photo"),
+      async () => {
+        const { url, revised_prompt } = await ctx.openai.generateImage(prompt);
+        return ctx.sendPhoto(url!, {
+          caption: revised_prompt,
+          // ...Markup.inlineKeyboard([
+          //   Markup.button.callback(ctx.$t("action.fullsize"), `fullsize:${url}`)
+          // ])
+        });
+      }
+    );
+  } catch (error: any) {
+    await ctx.sendMessage(error.message ?? ctx.$t("error.noimage"));
   }
-
-  await actions.generate(ctx, prompt);
 }
 
 export async function describeImage(ctx: BotContext) {

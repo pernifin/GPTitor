@@ -1,6 +1,6 @@
 import { Markup } from "telegraf";
-import { type Message, type CallbackQuery, type InlineKeyboardMarkup, type InlineKeyboardButton } from "typegram";
 
+import { type Message, type CallbackQuery, type InlineKeyboardMarkup, type InlineKeyboardButton } from "telegraf/types";
 import { type GeneratedImage } from "../../services/Midjourney";
 import type { BotContext } from "../../bot";
 import { format, callUntil } from "../../utils";
@@ -80,15 +80,24 @@ const trackProgress = async (ctx: BotContext, callback: (tracker: (progress: num
 };
 
 export default {
+  async fullsize(ctx: BotContext, imageUrl: string) {
+    await callUntil(
+      () => ctx.sendChatAction("upload_photo"),
+      ctx.sendDocument(imageUrl)
+    );
+  },
   async generate(ctx: BotContext, prompt: string) {
-    await trackProgress(ctx, (setProgress) => {
-      const message = (ctx.message || ctx.callbackQuery?.message) as Message.PhotoMessage & Message.TextMessage;
-      if (message.photo) {
-        prompt = `${ctx.host}/file/${message.photo[0].file_id}.png ${prompt}`;
-      }
+    // await trackProgress(ctx, (setProgress) => {
+    //   const message = (ctx.message || ctx.callbackQuery?.message) as Message.PhotoMessage & Message.TextMessage;
+    //   if (message.photo) {
+    //     prompt = `${ctx.host}/file/${message.photo[0].file_id}.png ${prompt}`;
+    //   }
 
-      return sendImage(ctx, ctx.midjourney.generate(prompt, setProgress));
-    });
+    //   return sendImage(ctx, ctx.midjourney.generate(prompt, setProgress));
+    // });
+    const message = (ctx.message || ctx.callbackQuery?.message) as Message.TextMessage;
+
+    return sendImage(ctx, ctx.midjourney.generate(prompt));
   },
 
   async upscale(ctx: BotContext, payload: string) {

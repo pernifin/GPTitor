@@ -1,5 +1,5 @@
 import { Telegraf, Context, Scenes, session } from "telegraf";
-import { Update, CallbackQuery } from 'typegram';
+import { Update, CallbackQuery } from "telegraf/types";
 import ffmpeg from "fluent-ffmpeg";
 
 import { definitions } from "./scenes/dialog/commands";
@@ -8,8 +8,8 @@ import antispamScene from "./scenes/antispam";
 import dialogScene, { DIALOG_SCENE_ID } from "./scenes/dialog";
 import {
   services,
-  Datastore, OpenAI, Quota, Settings, Translation, Conversation, Midjourney,
-  type UserQuota, type ChatSettings, type Translator
+  Datastore, OpenAI, Quota, Settings, Translation, Conversation,
+  type UserQuota, type ChatSettings, type Translator, type Midjourney,
 } from "./services";
 
 export type SceneState = Scenes.SceneSessionData & {
